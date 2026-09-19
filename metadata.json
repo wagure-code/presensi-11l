@@ -1,0 +1,8 @@
+{
+  "name": "Remix Portal Akademik \u0026 Presensi Siswa",
+  "description": "Dashboard interaktif siswa untuk presensi harian, jadwal mata pelajaran, jadwal piket kelas, pelacak PR, dan pengingat tenggat waktu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
