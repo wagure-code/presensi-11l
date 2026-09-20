@@ -48,6 +48,8 @@ export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
   const [newStudentName, setNewStudentName] = useState('');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
 
+  const isWeekendSelected = selectedDay === 'Sabtu' || selectedDay === 'Minggu';
+
   const currentDuty = duties.find((d) => d.day === selectedDay) || {
     id: `piket-${selectedDay.toLowerCase()}`,
     day: selectedDay,
@@ -220,11 +222,18 @@ export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-5">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
               <div>
-                <h2 className="text-base font-bold text-slate-900">
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   Regu Petugas Piket ({selectedDay})
+                  {isWeekendSelected && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+                      Hari Libur
+                    </span>
+                  )}
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Daftar siswa yang bertanggung jawab pada hari {selectedDay}
+                  {isWeekendSelected
+                    ? `${selectedDay} libur sekolah — piket tidak dijadwalkan, tapi tetap bisa diisi kalau kelasmu ada kegiatan.`
+                    : `Daftar siswa yang bertanggung jawab pada hari ${selectedDay}`}
                 </p>
               </div>
 

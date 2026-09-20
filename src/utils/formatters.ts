@@ -10,7 +10,6 @@ export const INDONESIAN_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'J
 export const getCurrentIndonesianDay = (date: Date = new Date()): DayOfWeek => {
   const dayIndex = date.getDay();
   const dayName = INDONESIAN_DAYS[dayIndex];
-  if (dayName === 'Minggu') return 'Senin'; // If Sunday, default school view to Monday
   return dayName as DayOfWeek;
 };
 
