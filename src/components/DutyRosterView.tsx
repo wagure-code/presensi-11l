@@ -27,7 +27,7 @@ interface DutyRosterViewProps {
   onOpenCycleModal?: () => void;
 }
 
-const DUTY_DAYS: DayOfWeek[] = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+const DUTY_DAYS: DayOfWeek[] = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
   duties,

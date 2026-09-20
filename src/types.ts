@@ -1,4 +1,4 @@
-export type DayOfWeek = 'Senin' | 'Selasa' | 'Rabu' | 'Kamis' | 'Jumat' | 'Sabtu';
+export type DayOfWeek = 'Senin' | 'Selasa' | 'Rabu' | 'Kamis' | 'Jumat' | 'Sabtu' | 'Minggu';
 
 export type AttendanceStatus = 'hadir' | 'sakit' | 'izin' | 'terlambat' | 'alpha';
 

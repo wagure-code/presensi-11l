@@ -135,7 +135,7 @@ app.delete('/api/schedules/:id', requireAuth, requireGuru, ah(async (req, res) =
 
 // ---------- DUTIES (piket) ----------
 
-const DUTY_DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+const DUTY_DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 const DEFAULT_DUTY_TASKS = ['Menyapu Lantai', 'Membersihkan Papan Tulis', 'Membuang Sampah'];
 
 // Ensure every weekday has a duty row for this class so the frontend always has something real to update.
