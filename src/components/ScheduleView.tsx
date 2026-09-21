@@ -374,6 +374,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                           </span>
                         </div>
                         
+                        <a
                           href={meetUrl}
                           target="_blank"
                           rel="noopener noreferrer"
