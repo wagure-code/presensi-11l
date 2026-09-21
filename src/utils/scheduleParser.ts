@@ -47,7 +47,6 @@ export function parseScheduleText(text: string): ParseScheduleResult {
   const unrecognized: string[] = [];
 
   for (const line of lines) {
-    // A line that is *just* a day name acts as a header for the lines that follow
     const dayOnlyMatch = line.match(DAY_ONLY_REGEX);
     if (dayOnlyMatch) {
       currentDay = DAY_MAP[dayOnlyMatch[1].toLowerCase()];

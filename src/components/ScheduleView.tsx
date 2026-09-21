@@ -1,3 +1,6 @@
+import { ImportScheduleModal } from './ImportScheduleModal';
+import { ParsedScheduleRow } from '../utils/scheduleParser';
+import { ClipboardPaste } from 'lucide-react';
 import React, { useState } from 'react';
 import { 
   CalendarDays, 
@@ -121,24 +124,24 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   };
 
   const handleImportSchedule = (rows: ParsedScheduleRow[], replaceExisting: boolean) => {
-    if (replaceExisting) {
-      schedules.forEach((s) => onDeleteSchedule(s.id));
-    }
-    rows.forEach((row, idx) => {
-      onAddSchedule({
-        id: `sch-import-${Date.now()}-${idx}`,
-        day: row.day,
-        subject: row.subject,
-        teacher: row.teacher || 'Guru Pengampu',
-        room: row.room || 'Ruang Kelas',
-        startTime: row.startTime,
-        endTime: row.endTime,
-        colorTag: COLOR_ROTATION[idx % COLOR_ROTATION.length],
-        onlinePlatform: 'Google Meet',
-      });
+  if (replaceExisting) {
+    schedules.forEach((s) => onDeleteSchedule(s.id));
+  }
+  rows.forEach((row, idx) => {
+    onAddSchedule({
+      id: `sch-import-${Date.now()}-${idx}`,
+      day: row.day,
+      subject: row.subject,
+      teacher: row.teacher || 'Guru Pengampu',
+      room: row.room || 'Ruang Kelas',
+      startTime: row.startTime,
+      endTime: row.endTime,
+      colorTag: COLOR_ROTATION[idx % COLOR_ROTATION.length],
+      onlinePlatform: 'Google Meet',
     });
-    setSelectedDay(rows[0]?.day || selectedDay);
-  };
+  });
+  setSelectedDay(rows[0]?.day || selectedDay);
+};
 
   // Filter and sort schedule for chosen day
   const daySchedules = schedules
