@@ -207,7 +207,9 @@ function AppShell() {
   const handleQuickCheckIn = async () => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const isLate = now.getHours() >= 7 && now.getMinutes() > 15;
+    const classStartMinutes = 8 * 60 + 15;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const isLate = nowMinutes >= classStartMinutes;
     const isOnline = learningCycle.currentMode === 'online';
 
     const payload = {

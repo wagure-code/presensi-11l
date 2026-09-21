@@ -43,12 +43,14 @@ export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
     DUTY_DAYS.includes(currentDay) ? currentDay : 'Senin'
   );
 
+  const isWeekendSelected = selectedDay === 'Sabtu' || selectedDay === 'Minggu';
+
   const isOnline = activeCycle.currentMode === 'online';
 
   const [newStudentName, setNewStudentName] = useState('');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
-
-  const isWeekendSelected = selectedDay === 'Sabtu' || selectedDay === 'Minggu';
+  const [newTaskName, setNewTaskName] = useState('');
+  const [isAddingTask, setIsAddingTask] = useState(false);
 
   const currentDuty = duties.find((d) => d.day === selectedDay) || {
     id: `piket-${selectedDay.toLowerCase()}`,
@@ -87,6 +89,37 @@ export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
         return {
           ...d,
           students: d.students.filter((s) => s !== studentName),
+        };
+      }
+      return d;
+    });
+    onUpdateDuty(updated);
+  };
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskName.trim()) return;
+
+    const dutyExists = duties.some((d) => d.day === selectedDay);
+    const updated = dutyExists
+      ? duties.map((d) =>
+          d.day === selectedDay ? { ...d, tasks: [...d.tasks, newTaskName.trim()] } : d
+        )
+      : [...duties, { ...currentDuty, tasks: [...currentDuty.tasks, newTaskName.trim()] }];
+
+    onUpdateDuty(updated);
+    setNewTaskName('');
+    setIsAddingTask(false);
+  };
+
+  const handleRemoveTask = (task: string) => {
+    const dutyExists = duties.some((d) => d.day === selectedDay);
+    if (!dutyExists) return;
+    const updated = duties.map((d) => {
+      if (d.day === selectedDay) {
+        return {
+          ...d,
+          tasks: d.tasks.filter((t) => t !== task),
         };
       }
       return d;
@@ -152,7 +185,7 @@ export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
         )}
 
         {/* Day Selector Buttons */}
-        <div className="grid grid-cols-5 gap-2 pt-5 mt-4 border-t border-slate-100">
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 pt-5 mt-4 border-t border-slate-100">
           {DUTY_DAYS.map((day) => {
             const duty = duties.find((d) => d.day === day);
             const isToday = day === currentDay;
@@ -323,20 +356,57 @@ export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
         <div className="lg:col-span-5 space-y-5">
           
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-5">
-            <h2 className="text-base font-bold text-slate-900 mb-1">
-              Rincian Tugas Piket
-            </h2>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-bold text-slate-900">
+                Rincian Tugas Piket
+              </h2>
+              <button
+                onClick={() => setIsAddingTask((v) => !v)}
+                className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Tambah
+              </button>
+            </div>
             <p className="text-xs text-slate-500 mb-4">
               Standar kebersihan ruang kelas {profile.className}
             </p>
 
+            {isAddingTask && (
+              <form onSubmit={handleAddTask} className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  autoFocus
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  placeholder="Contoh: Merapikan meja & kursi"
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm focus:outline-hidden focus:border-indigo-500"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
+                >
+                  Simpan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsAddingTask(false); setNewTaskName(''); }}
+                  className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold cursor-pointer"
+                >
+                  Batal
+                </button>
+              </form>
+            )}
+
             <div className="space-y-3 mb-6">
+              {currentDuty.tasks.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-4">Belum ada tugas piket. Klik "Tambah" untuk menambahkan.</p>
+              )}
               {currentDuty.tasks.map((task, idx) => (
-                <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div key={idx} className="group flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
                   <div className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Check className="w-3.5 h-3.5 stroke-[3]" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <span className="text-xs sm:text-sm font-semibold text-slate-800 block">
                       {task}
                     </span>
@@ -344,6 +414,13 @@ export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
                       Wajib diselesaikan sebelum pelajaran pertama atau seusai jam pulang.
                     </span>
                   </div>
+                  <button
+                    onClick={() => handleRemoveTask(task)}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 transition-opacity cursor-pointer flex-shrink-0"
+                    title="Hapus tugas ini"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ))}
             </div>

@@ -59,7 +59,7 @@ export const AttendanceAnalyticsPanel: React.FC<AttendanceAnalyticsPanelProps> =
 
   const [formStudentId, setFormStudentId] = useState('');
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
-  const [formTime, setFormTime] = useState('07:00');
+  const [formTime, setFormTime] = useState('08:00');
   const [formStatus, setFormStatus] = useState<AttendanceStatus>('hadir');
   const [formNote, setFormNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -128,7 +128,7 @@ export const AttendanceAnalyticsPanel: React.FC<AttendanceAnalyticsPanelProps> =
   const openManualModal = () => {
     setFormStudentId(students[0]?.id || '');
     setFormDate(new Date().toISOString().split('T')[0]);
-    setFormTime('07:00');
+    setFormTime('08:00');
     setFormStatus('hadir');
     setFormNote('');
     setFormError(null);

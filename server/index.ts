@@ -298,7 +298,7 @@ app.post('/api/attendance/manual', requireAuth, requireGuru, ah(async (req, res)
   const id = randomUUID();
   await db.prepare(`INSERT INTO attendance (id, userId, className, date, time, status, note, method)
     VALUES (?, ?, ?, ?, ?, ?, ?, 'Manual Guru')`)
-    .run(id, studentId, req.user!.className, date, time || '07:00:00', status, note || null);
+    .run(id, studentId, req.user!.className, date, time || '08:00:00', status, note || null);
   res.status(201).json({ id, studentId, date, time, status, note });
 }));
 

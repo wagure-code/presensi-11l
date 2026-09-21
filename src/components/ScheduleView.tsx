@@ -1,7 +1,4 @@
-import { ImportScheduleModal } from './ImportScheduleModal';
-import { ParsedScheduleRow } from '../utils/scheduleParser';
-import { ClipboardPaste } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   CalendarDays, 
   Clock, 
@@ -58,13 +55,27 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const [formSubject, setFormSubject] = useState('');
   const [formTeacher, setFormTeacher] = useState('');
   const [formRoom, setFormRoom] = useState('');
-  const [formStartTime, setFormStartTime] = useState('07:00');
+  const [formStartTime, setFormStartTime] = useState('08:00');
   const [formEndTime, setFormEndTime] = useState('08:30');
   const [formColor, setFormColor] = useState('blue');
   const [formDay, setFormDay] = useState<DayOfWeek>(selectedDay);
   const [formOnlineUrl, setFormOnlineUrl] = useState('');
+  const [isAddingNewSubject, setIsAddingNewSubject] = useState(false);
+  const [isAddingNewTeacher, setIsAddingNewTeacher] = useState(false);
+
+  // Daftar mapel & guru yang pernah diinput sebelumnya — dipakai sebagai pilihan dropdown
+  const subjectOptions = useMemo(
+    () => Array.from(new Set(schedules.map((s) => s.subject).filter(Boolean))).sort(),
+    [schedules]
+  );
+  const teacherOptions = useMemo(
+    () => Array.from(new Set(schedules.map((s) => s.teacher).filter(Boolean))).sort(),
+    [schedules]
+  );
 
   const openAddModal = (item?: SubjectSchedule) => {
+    setIsAddingNewSubject(false);
+    setIsAddingNewTeacher(false);
     if (item) {
       setEditingItem(item);
       setFormSubject(item.subject);
@@ -80,7 +91,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       setFormSubject('');
       setFormTeacher('');
       setFormRoom('');
-      setFormStartTime('07:00');
+      setFormStartTime('08:00');
       setFormEndTime('08:30');
       setFormColor('blue');
       setFormDay(selectedDay);
@@ -124,24 +135,24 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   };
 
   const handleImportSchedule = (rows: ParsedScheduleRow[], replaceExisting: boolean) => {
-  if (replaceExisting) {
-    schedules.forEach((s) => onDeleteSchedule(s.id));
-  }
-  rows.forEach((row, idx) => {
-    onAddSchedule({
-      id: `sch-import-${Date.now()}-${idx}`,
-      day: row.day,
-      subject: row.subject,
-      teacher: row.teacher || 'Guru Pengampu',
-      room: row.room || 'Ruang Kelas',
-      startTime: row.startTime,
-      endTime: row.endTime,
-      colorTag: COLOR_ROTATION[idx % COLOR_ROTATION.length],
-      onlinePlatform: 'Google Meet',
+    if (replaceExisting) {
+      schedules.forEach((s) => onDeleteSchedule(s.id));
+    }
+    rows.forEach((row, idx) => {
+      onAddSchedule({
+        id: `sch-import-${Date.now()}-${idx}`,
+        day: row.day,
+        subject: row.subject,
+        teacher: row.teacher || 'Guru Pengampu',
+        room: row.room || 'Ruang Kelas',
+        startTime: row.startTime,
+        endTime: row.endTime,
+        colorTag: COLOR_ROTATION[idx % COLOR_ROTATION.length],
+        onlinePlatform: 'Google Meet',
+      });
     });
-  });
-  setSelectedDay(rows[0]?.day || selectedDay);
-};
+    setSelectedDay(rows[0]?.day || selectedDay);
+  };
 
   // Filter and sort schedule for chosen day
   const daySchedules = schedules
@@ -362,7 +373,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             {isOnline ? 'Google Meet Kelas' : 'Tautan Daring (Cadangan)'}
                           </span>
                         </div>
-                        <a
+                        
                           href={meetUrl}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -434,14 +445,48 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Mata Pelajaran</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Matematika Peminatan"
-                  value={formSubject}
-                  onChange={(e) => setFormSubject(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm focus:border-indigo-500"
-                />
+                {!isAddingNewSubject ? (
+                  <select
+                    required
+                    value={subjectOptions.includes(formSubject) ? formSubject : ''}
+                    onChange={(e) => {
+                      if (e.target.value === '__new__') {
+                        setIsAddingNewSubject(true);
+                        setFormSubject('');
+                      } else {
+                        setFormSubject(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm bg-white focus:border-indigo-500"
+                  >
+                    <option value="" disabled>Pilih mata pelajaran...</option>
+                    {subjectOptions.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                    <option value="__new__">+ Tambah mata pelajaran baru</option>
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      required
+                      placeholder="Contoh: Matematika Peminatan"
+                      value={formSubject}
+                      onChange={(e) => setFormSubject(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm focus:border-indigo-500"
+                    />
+                    {subjectOptions.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => { setIsAddingNewSubject(false); setFormSubject(''); }}
+                        className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold cursor-pointer whitespace-nowrap"
+                      >
+                        Pilih dari daftar
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -469,13 +514,46 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Guru Pengampu</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Drs. Supriyadi, M.Pd."
-                  value={formTeacher}
-                  onChange={(e) => setFormTeacher(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm focus:border-indigo-500"
-                />
+                {!isAddingNewTeacher ? (
+                  <select
+                    value={teacherOptions.includes(formTeacher) ? formTeacher : ''}
+                    onChange={(e) => {
+                      if (e.target.value === '__new__') {
+                        setIsAddingNewTeacher(true);
+                        setFormTeacher('');
+                      } else {
+                        setFormTeacher(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm bg-white focus:border-indigo-500"
+                  >
+                    <option value="">Pilih guru pengampu...</option>
+                    {teacherOptions.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                    <option value="__new__">+ Tambah guru baru</option>
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Contoh: Drs. Supriyadi, M.Pd."
+                      value={formTeacher}
+                      onChange={(e) => setFormTeacher(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm focus:border-indigo-500"
+                    />
+                    {teacherOptions.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => { setIsAddingNewTeacher(false); setFormTeacher(''); }}
+                        className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold cursor-pointer whitespace-nowrap"
+                      >
+                        Pilih dari daftar
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -552,4 +630,3 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     </div>
   );
 };
-
