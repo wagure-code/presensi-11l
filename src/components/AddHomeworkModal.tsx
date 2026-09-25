@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, AlertTriangle, BookOpen, FileText } from 'lucide-react';
+import { X, Calendar, Clock, AlertTriangle, BookOpen, FileText, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react';
 import { Homework, TaskPriority, TaskCategory } from '../types';
+import { uploadHomeworkPhoto } from '../utils/supabaseClient';
 
 interface AddHomeworkModalProps {
   isOpen: boolean;
@@ -48,6 +49,12 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
   const [category, setCategory] = useState<TaskCategory>('PR Individu');
   const [description, setDescription] = useState('');
 
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | undefined>(undefined);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   useEffect(() => {
     if (editingItem) {
       setTitle(editingItem.title);
@@ -63,6 +70,9 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
       setPriority(editingItem.priority);
       setCategory(editingItem.category);
       setDescription(editingItem.description || '');
+      setExistingPhotoUrl(editingItem.photoUrl);
+      setPhotoFile(null);
+      setPhotoPreview(null);
     } else {
       // Defaults for new
       const tomorrow = new Date();
@@ -79,16 +89,48 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
       setPriority('sedang');
       setCategory('PR Individu');
       setDescription('');
+      setExistingPhotoUrl(undefined);
+      setPhotoFile(null);
+      setPhotoPreview(null);
     }
+    setUploadError(null);
   }, [editingItem, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+    setUploadError(null);
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setExistingPhotoUrl(undefined);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
     const chosenSubject = subject === 'Lainnya' ? customSubject.trim() || 'Umum' : subject;
+
+    let photoUrl = existingPhotoUrl;
+    if (photoFile) {
+      setIsUploading(true);
+      setUploadError(null);
+      try {
+        photoUrl = await uploadHomeworkPhoto(photoFile);
+      } catch (err: any) {
+        setUploadError(err.message || 'Gagal mengunggah foto.');
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
 
     const data: Homework = {
       id: editingItem ? editingItem.id : `hw-${Date.now()}`,
@@ -102,6 +144,7 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
       completed: editingItem ? editingItem.completed : false,
       completedAt: editingItem?.completedAt,
       createdAt: editingItem ? editingItem.createdAt : new Date().toISOString().split('T')[0],
+      photoUrl,
     };
 
     onSave(data);
@@ -266,6 +309,51 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
             />
           </div>
 
+          {/* Lampiran Foto */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Lampiran Foto (Opsional)
+            </label>
+            <p className="text-[11px] text-slate-400 mb-2">
+              Contoh: foto papan tulis atau lembar soal yang diberikan.
+            </p>
+
+            {(photoPreview || existingPhotoUrl) ? (
+              <div className="relative inline-block">
+                <img
+                  src={photoPreview || existingPhotoUrl}
+                  alt="Lampiran tugas"
+                  className="max-h-40 rounded-xl border border-slate-200 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md cursor-pointer"
+                  title="Hapus foto"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 px-4 py-6 rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 cursor-pointer transition-colors">
+                <ImageIcon className="w-5 h-5 text-slate-400" />
+                <span className="text-xs font-semibold text-slate-500">Klik untuk pilih foto</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="hidden"
+                />
+              </label>
+            )}
+
+            {uploadError && (
+              <div className="mt-2 text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+                {uploadError}
+              </div>
+            )}
+          </div>
+
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
             <button
@@ -277,9 +365,11 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs cursor-pointer"
+              disabled={isUploading}
+              className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 shadow-xs cursor-pointer flex items-center gap-2"
             >
-              {editingItem ? 'Simpan Perubahan' : 'Tambah Tugas'}
+              {isUploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isUploading ? 'Mengunggah foto...' : editingItem ? 'Simpan Perubahan' : 'Tambah Tugas'}
             </button>
           </div>
 

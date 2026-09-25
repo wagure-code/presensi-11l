@@ -65,6 +65,7 @@ export interface Homework {
   completedAt?: string;
   createdAt: string;
   submissionMode?: 'Online (LMS/Drive)' | 'Langsung ke Guru' | 'Fleksibel';
+  photoUrl?: string;
 }
 
 export interface NotificationItem {

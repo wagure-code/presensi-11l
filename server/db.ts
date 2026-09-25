@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS homeworks (
   category TEXT NOT NULL,
   description TEXT,
   "submissionMode" TEXT,
+  "photoUrl" TEXT,
   "createdAt" TEXT NOT NULL,
   "createdBy" TEXT
 );
@@ -161,6 +162,10 @@ CREATE TABLE IF NOT EXISTS learning_cycle (
   "defaultMeetLink" TEXT,
   "cycleNotes" TEXT
 );
+
+-- Safe to re-run: adds the column only if it doesn't already exist (covers databases
+-- that were created before this field existed).
+ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
 `);
 }
 

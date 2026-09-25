@@ -341,6 +341,21 @@ export const HomeworkView: React.FC<HomeworkViewProps> = ({
                           {hw.description}
                         </p>
                       )}
+                      {hw.photoUrl && (
+                        
+                        <a
+                          href={hw.photoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block mt-2"
+                        >
+                          <img
+                            src={hw.photoUrl}
+                            alt="Lampiran tugas"
+                            className="max-h-28 rounded-lg border border-slate-200 hover:opacity-90 transition-opacity object-cover"
+                          />
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>
