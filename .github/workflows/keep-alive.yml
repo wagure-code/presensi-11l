@@ -1,0 +1,17 @@
+name: Keep Supabase Awake
+
+on:
+  schedule:
+    # Every 3 days at 03:00 UTC — well under Supabase's 7-day pause window.
+    - cron: '0 3 */3 * *'
+  workflow_dispatch: {} # lets you trigger it manually from the Actions tab too
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the app's health endpoint
+        run: |
+          curl -sf "https://presensi-11l-nine.vercel.app/api/health" \
+            && echo "OK — Supabase pinged successfully" \
+            || (echo "Ping failed" && exit 1)

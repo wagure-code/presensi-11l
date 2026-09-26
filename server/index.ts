@@ -20,6 +20,15 @@ const ah = (fn: (req: Request, res: Response) => Promise<any>) => (req: Request,
   });
 };
 
+// Lightweight, unauthenticated endpoint that touches the database — used by a
+// scheduled GitHub Actions ping to keep the Supabase free-tier project from
+// auto-pausing after 7 days of inactivity. Safe to call publicly: it reveals
+// nothing and mutates nothing.
+app.get('/api/health', ah(async (_req, res) => {
+  await db.prepare('SELECT 1').get();
+  res.json({ ok: true, time: new Date().toISOString() });
+}));
+
 // ---------- AUTH ----------
 
 // Login (guru & siswa)
