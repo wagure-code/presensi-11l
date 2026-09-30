@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/logo.png';
 
 export const LoginView: React.FC = () => {
   const { login, error } = useAuth();
@@ -23,7 +24,7 @@ export const LoginView: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 font-['Plus_Jakarta_Sans',sans-serif]">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg border border-slate-100 p-8">
         <div className="text-center mb-6">
-          <div className="text-3xl mb-2">🎓</div>
+          <img src={logo} alt="Logo" className="w-16 h-16 mx-auto mb-3 rounded-xl shadow-sm" />
           <h1 className="text-xl font-bold text-slate-900">Portal Akademik & Presensi</h1>
           <p className="text-sm text-slate-500 mt-1">Masuk untuk melanjutkan</p>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logo from '../assets/logo.png';
 import { 
   Bell, 
   Volume2, 
@@ -68,8 +69,8 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Logo & School/Student Info */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center text-xl sm:text-2xl shadow-sm ring-2 ring-indigo-100">
-              {profile.avatarEmoji || '🎓'}
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white flex items-center justify-center shadow-sm ring-2 ring-indigo-100 overflow-hidden">
+             <img src={logo} alt="Logo" className="w-full h-full object-cover" /> 
             </div>
             <div>
               <div className="flex items-center gap-2">
