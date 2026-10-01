@@ -27,6 +27,7 @@ import { NotificationModal } from './components/NotificationModal';
 import { ProfileModal } from './components/ProfileModal';
 import { LearningCycleModal } from './components/LearningCycleModal';
 import { StudentManagementView } from './components/StudentManagementView';
+import { SplashScreen } from './components/SplashScreen';
 
 const defaultLearningCycle: LearningCycleState = {
   currentMode: 'online',
@@ -556,16 +557,24 @@ function AppShell() {
 
 export default function App() {
   const { user, loading } = useAuth();
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-400 text-sm">Memuat...</div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => setMinTimeElapsed(true), 1800);
+    return () => clearTimeout(timer);
+  }, []);
 
-  if (!user) return <LoginView />;
+  const showSplash = loading || !minTimeElapsed;
 
-  return <AppShell key={user.id} />;
+  return (
+    <AnimatePresence mode="wait">
+      {showSplash ? (
+        <SplashScreen key="splash" />
+      ) : !user ? (
+        <LoginView key="login" />
+      ) : (
+        <AppShell key={user.id} />
+      )}
+    </AnimatePresence>
+  );
 }
