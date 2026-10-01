@@ -178,7 +178,7 @@ export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
                 Pemberitahuan Siklus 2 Bulan Online:
               </span>
               <p className="text-cyan-900 mt-0.5 leading-relaxed">
-                Selama kelas berlangsung secara daring dari rumah (bulan 1 & 2), piket kebersihan fisik di sekolah diliburkan. Regu piket yang dijadwalkan di bawah ini tetap tersimpan dan otomatis aktif kembali saat bulan ke-3 ketika kelas masuk secara offline.
+                "Selama kelas daring berlangsung dari rumah, regu piket bertugas mengingatkan jadwal pelajaran, membagikan link zoom, mendokumentasikan sesi pelajaran, dan mencatat pr yang diberikan oleh guru pengampu."
               </p>
             </div>
           </div>

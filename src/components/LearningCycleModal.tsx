@@ -238,7 +238,7 @@ export const LearningCycleModal: React.FC<LearningCycleModalProps> = ({
               </div>
               <div className="grid grid-cols-3 p-2.5 text-slate-700">
                 <span className="font-medium text-slate-500">Piket Kebersihan</span>
-                <span className="text-amber-700 font-semibold">Diliburkan (Nonaktif)</span>
+                <span className="text-emerald-700 font-semibold">Aktif (Tugas Daring)</span>
                 <span className="text-emerald-700 font-semibold">Aktif Sesuai Regu</span>
               </div>
               <div className="grid grid-cols-3 p-2.5 text-slate-700">

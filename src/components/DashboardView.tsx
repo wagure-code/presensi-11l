@@ -609,7 +609,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Piket Fisik Diliburkan (Siklus 2 Bulan Online)
                   </p>
                   <p className="text-[11px] text-cyan-900 mt-0.5 leading-relaxed">
-                    Karena kelas saat ini dalam mode pembelajaran daring dari rumah, tugas piket kebersihan fisik ruangan kelas di sekolah dinonaktifkan sementara dan akan kembali aktif di bulan ke-3 saat tatap muka.
+                    Karena kelas saat ini dalam mode pembelajaran daring dari rumah, regu piket bertugas mengingatkan jadwal pelajaran, membagikan link zoom, mendokumentasikan sesi pelajaran, dan mencatat pr yang diberikan oleh guru pengampu."
                   </p>
                 </div>
               </div>
