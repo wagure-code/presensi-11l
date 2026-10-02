@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 
-export const LoginView: React.FC = () => {
+interface LoginViewProps {
+  onSwitchToRegister: () => void;
+}
+
+export const LoginView: React.FC<LoginViewProps> = ({ onSwitchToRegister }) => {
   const { login, error } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -71,6 +75,12 @@ export const LoginView: React.FC = () => {
         <p className="text-[11px] text-slate-400 text-center mt-5">
           Akun siswa dibuat oleh guru/wali kelas. Hubungi guru jika belum punya akun.
         </p>
+        <button
+          onClick={onSwitchToRegister}
+          className="w-full text-center text-xs text-indigo-600 hover:text-indigo-700 font-semibold mt-3 cursor-pointer"
+        >
+          Wali kelas baru? Daftar kelas baru di sini
+        </button>
       </div>
     </div>
   );

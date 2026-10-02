@@ -42,6 +42,8 @@ export async function apiFetch<T = any>(path: string, options: RequestInit = {})
 }
 
 export const api = {
+  registerClass: (payload: any) =>
+    apiFetch<{ token: string; user: any }>('/api/auth/register-class', { method: 'POST', body: JSON.stringify(payload) }),
   login: (username: string, password: string) =>
     apiFetch<{ token: string; user: any }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => apiFetch('/api/auth/me'),

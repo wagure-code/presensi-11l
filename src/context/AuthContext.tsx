@@ -18,6 +18,7 @@ interface AuthContextValue {
   loading: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<void>;
+  completeAuth: (token: string, user: AuthUser) => void;
   logout: () => void;
 }
 
@@ -53,13 +54,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const completeAuth = (token: string, u: AuthUser) => {
+    setToken(token);
+    setUser(u);
+  };
+
   const logout = () => {
     clearToken();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, error, login, completeAuth, logout }}>
       {children}
     </AuthContext.Provider>
   );

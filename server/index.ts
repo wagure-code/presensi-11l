@@ -29,6 +29,43 @@ app.get('/api/health', ah(async (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 }));
 
+
+// Pendaftaran kelas baru — publik, tapi diproteksi kode rahasia
+app.post('/api/auth/register-class', ah(async (req, res) => {
+  const { registrationCode, className, schoolName, guruName, guruUsername, guruPassword } = req.body;
+
+  if (!registrationCode || registrationCode !== process.env.CLASS_REGISTRATION_CODE) {
+    return res.status(403).json({ error: 'Kode pendaftaran salah atau belum diisi.' });
+  }
+  if (!className?.trim() || !guruName?.trim() || !guruUsername?.trim() || !guruPassword?.trim()) {
+    return res.status(400).json({ error: 'Semua kolom wajib diisi.' });
+  }
+  if (guruPassword.length < 6) {
+    return res.status(400).json({ error: 'Password minimal 6 karakter.' });
+  }
+
+  const trimmedClassName = className.trim();
+
+  const existingClass = await db.prepare('SELECT id FROM users WHERE className = ?').get(trimmedClassName);
+  if (existingClass) {
+    return res.status(409).json({ error: `Nama kelas "${trimmedClassName}" sudah terdaftar. Coba nama lain, misalnya tambahkan tahun angkatan.` });
+  }
+
+  const existingUsername = await db.prepare('SELECT id FROM users WHERE username = ?').get(guruUsername.trim());
+  if (existingUsername) {
+    return res.status(409).json({ error: 'Username sudah dipakai, coba username lain.' });
+  }
+
+  const id = randomUUID();
+  await db.prepare(`INSERT INTO users (id, username, passwordHash, role, name, className, schoolName, createdAt)
+    VALUES (?, ?, ?, 'guru', ?, ?, ?, ?)`)
+    .run(id, guruUsername.trim(), bcrypt.hashSync(guruPassword, 10), guruName.trim(), trimmedClassName, schoolName?.trim() || null, new Date().toISOString());
+
+  const payload = { id, username: guruUsername.trim(), role: 'guru' as const, className: trimmedClassName, name: guruName.trim() };
+  const token = signToken(payload);
+  res.status(201).json({ token, user: { ...payload, nis: null, schoolName: schoolName?.trim() || null, semester: null, avatarEmoji: '🧑‍🎓' } });
+}));
+
 // ---------- AUTH ----------
 
 // Login (guru & siswa)

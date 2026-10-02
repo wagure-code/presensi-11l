@@ -1,3 +1,4 @@
+import { RegisterClassView } from './components/RegisterClassView';
 import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -565,13 +566,18 @@ export default function App() {
   }, []);
 
   const showSplash = loading || !minTimeElapsed;
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   return (
     <AnimatePresence mode="wait">
       {showSplash ? (
         <SplashScreen key="splash" />
       ) : !user ? (
-        <LoginView key="login" />
+        authMode === 'login' ? (
+          <LoginView key="login" onSwitchToRegister={() => setAuthMode('register')} />
+        ) : (
+          <RegisterClassView key="register" onSwitchToLogin={() => setAuthMode('login')} />
+        )
       ) : (
         <AppShell key={user.id} />
       )}
