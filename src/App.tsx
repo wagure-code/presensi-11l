@@ -1,5 +1,5 @@
 import { RegisterClassView } from './components/RegisterClassView';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   StudentProfile,
@@ -559,14 +559,26 @@ function AppShell() {
 export default function App() {
   const { user, loading } = useAuth();
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const prevUserRef = useRef<typeof user>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setMinTimeElapsed(true), 1800);
     return () => clearTimeout(timer);
   }, []);
 
+  // Putar ulang splash screen setiap kali user logout (pindah dari sudah-login ke belum-login)
+  useEffect(() => {
+    if (prevUserRef.current && !user) {
+      setMinTimeElapsed(false);
+      const timer = setTimeout(() => setMinTimeElapsed(true), 1800);
+      prevUserRef.current = user;
+      return () => clearTimeout(timer);
+    }
+    prevUserRef.current = user;
+  }, [user]);
+
   const showSplash = loading || !minTimeElapsed;
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   return (
     <AnimatePresence mode="wait">
