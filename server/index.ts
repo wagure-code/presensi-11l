@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import db, { initSchema } from './db.js';
 import { signToken, requireAuth, requireGuru } from './auth.js';
+import { appendAttendanceRow, extractSheetId, formatSheetTimestamp } from './utils/googleSheets.js';
 
 const app = express();
 app.use(cors());
@@ -322,6 +323,23 @@ app.post('/api/attendance', requireAuth, ah(async (req, res) => {
       learningMode: a.learningMode || null,
       networkStatus: a.networkStatus || null,
     });
+
+  try {
+    const guru = await db.prepare(`SELECT attendanceSheetId, attendanceSheetTab FROM users WHERE role = 'guru' AND className = ? ORDER BY attendanceSheetId IS NULL ASC LIMIT 1`).get(req.user!.className) as any;
+    console.log('DEBUG sync - className siswa:', req.user!.className, '| hasil query guru:', guru);
+    if (guru?.attendanceSheetId) {
+      await appendAttendanceRow(guru.attendanceSheetId, guru.attendanceSheetTab || 'Form_Responses', {
+        timestamp: formatSheetTimestamp(now),
+        name: req.user!.name,
+        date,
+        status: a.status,
+        note: a.note || '',
+      });
+    }
+  } catch (err) {
+    console.error('Gagal sync presensi ke Google Sheet:', err);
+  }
+
   res.status(201).json({ ...a, id, date });
 }));
 
@@ -338,7 +356,7 @@ app.post('/api/attendance/manual', requireAuth, requireGuru, ah(async (req, res)
   const { studentId, date, time, status, note } = req.body;
   if (!studentId || !date || !status) return res.status(400).json({ error: 'studentId, date, dan status wajib diisi.' });
 
-  const student = await db.prepare(`SELECT id FROM users WHERE id = ? AND role = 'siswa' AND className = ?`).get(studentId, req.user!.className);
+  const student = await db.prepare(`SELECT id, name FROM users WHERE id = ? AND role = 'siswa' AND className = ?`).get(studentId, req.user!.className) as any;
   if (!student) return res.status(404).json({ error: 'Siswa tidak ditemukan di kelas ini.' });
 
   await db.prepare('DELETE FROM attendance WHERE userId = ? AND date = ?').run(studentId, date);
@@ -346,6 +364,22 @@ app.post('/api/attendance/manual', requireAuth, requireGuru, ah(async (req, res)
   await db.prepare(`INSERT INTO attendance (id, userId, className, date, time, status, note, method)
     VALUES (?, ?, ?, ?, ?, ?, ?, 'Manual Guru')`)
     .run(id, studentId, req.user!.className, date, time || '08:00:00', status, note || null);
+
+  try {
+    const sheetCfg = await db.prepare(`SELECT attendanceSheetId, attendanceSheetTab FROM users WHERE id = ?`).get(req.user!.id) as any;
+    if (sheetCfg?.attendanceSheetId) {
+      await appendAttendanceRow(sheetCfg.attendanceSheetId, sheetCfg.attendanceSheetTab || 'Form_Responses', {
+        timestamp: formatSheetTimestamp(new Date()),
+        name: student.name,
+        date,
+        status,
+        note: note || '',
+      });
+    }
+  } catch (err) {
+    console.error('Gagal sync presensi manual ke Google Sheet:', err);
+  }
+
   res.status(201).json({ id, studentId, date, time, status, note });
 }));
 
@@ -360,6 +394,30 @@ app.delete('/api/attendance/:id', requireAuth, ah(async (req, res) => {
   }
   await db.prepare('DELETE FROM attendance WHERE id = ?').run(req.params.id);
   res.status(204).end();
+}));
+
+// Guru: lihat/atur link Google Sheet tujuan sinkronisasi presensi
+app.get('/api/settings/attendance-sheet', requireAuth, requireGuru, ah(async (req, res) => {
+  const row = await db.prepare(`SELECT attendanceSheetId, attendanceSheetTab, isAdmin FROM users WHERE id = ?`).get(req.user!.id) as any;
+  res.json({
+    sheetId: row?.attendanceSheetId || null,
+    tabName: row?.attendanceSheetTab || 'Form_Responses',
+    isAdmin: !!row?.isAdmin,
+  });
+}));
+
+app.put('/api/settings/attendance-sheet', requireAuth, requireGuru, ah(async (req, res) => {
+  const me = await db.prepare(`SELECT isAdmin FROM users WHERE id = ?`).get(req.user!.id) as any;
+  if (!me?.isAdmin) {
+    return res.status(403).json({ error: 'Hanya akun Admin yang boleh mengubah tujuan sinkronisasi sheet.' });
+  }
+  const { sheetUrl, tabName } = req.body;
+  if (!sheetUrl) return res.status(400).json({ error: 'Link sheet wajib diisi.' });
+  const sheetId = extractSheetId(sheetUrl);
+  if (!sheetId) return res.status(400).json({ error: 'Link Google Sheet tidak valid.' });
+  await db.prepare(`UPDATE users SET attendanceSheetId = ?, attendanceSheetTab = ? WHERE id = ?`)
+    .run(sheetId, tabName || 'Form_Responses', req.user!.id);
+  res.json({ sheetId, tabName: tabName || 'Form_Responses' });
 }));
 
 // ---------- LEARNING CYCLE ----------
