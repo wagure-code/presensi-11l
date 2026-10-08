@@ -69,7 +69,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const activeCycle = learningCycle || initialLearningCycle;
   const todayDay = getCurrentIndonesianDay();
-  const todayStr = new Date().toISOString().split('T')[0];
+const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
   const isOnline = activeCycle.currentMode === 'online';
 
   // 1. Attendance stats

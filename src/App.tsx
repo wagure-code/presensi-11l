@@ -38,6 +38,10 @@ const defaultLearningCycle: LearningCycleState = {
   cycleStartDate: new Date().toISOString().split('T')[0],
 };
 
+function todayJakarta(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+}
+
 function AppShell() {
   const { user, logout } = useAuth();
   const isGuru = user!.role === 'guru';
@@ -115,7 +119,7 @@ function AppShell() {
   }, [user!.id]);
 
   const notifications = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = todayJakarta();
     const now = new Date();
     const items: any[] = [];
     const isOnline = learningCycle.currentMode === 'online';
@@ -166,7 +170,7 @@ function AppShell() {
     return items;
   }, [homeworks, attendance, learningCycle, readNotifIds, isGuru]);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayJakarta();
   const todayHasCheckedIn = attendance.some((a) => a.date === todayStr);
 
   const pendingHomeworkCount = homeworks.filter((h) => !h.completed).length;
