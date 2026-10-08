@@ -13,6 +13,10 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
 
+function todayJakarta(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+}
+
 // Wraps an async route handler so a rejected promise becomes a 500 instead of crashing the process.
 const ah = (fn: (req: Request, res: Response) => Promise<any>) => (req: Request, res: Response, next: NextFunction) => {
   fn(req, res).catch((err) => {
@@ -307,9 +311,13 @@ app.post('/api/attendance', requireAuth, ah(async (req, res) => {
   const a = req.body;
   const id = randomUUID();
   const now = new Date();
-  const date = a.date || now.toISOString().split('T')[0];
+  const today = todayJakarta();
+  const date = a.date || today;
+  if (date !== today) {
+    return res.status(403).json({ error: 'Presensi untuk tanggal ini sudah terkunci dan tidak bisa diubah lagi.' });
+  }
   await db.prepare('DELETE FROM attendance WHERE userId = ? AND date = ?').run(req.user!.id, date);
-  await db.prepare(`INSERT INTO attendance (id, userId, className, date, time, status, note, method, learningMode, networkStatus)
+    await db.prepare(`INSERT INTO attendance (id, userId, className, date, time, status, note, method, learningMode, networkStatus)
     VALUES (@id, @userId, @className, @date, @time, @status, @note, @method, @learningMode, @networkStatus)`)
     .run({
       id,
@@ -384,13 +392,11 @@ app.post('/api/attendance/manual', requireAuth, requireGuru, ah(async (req, res)
 }));
 
 // Delete an attendance record — only the student who submitted it, or a guru in the same class
-app.delete('/api/attendance/:id', requireAuth, ah(async (req, res) => {
+// Delete an attendance record — guru only (siswa tidak diizinkan menghapus presensi)
+app.delete('/api/attendance/:id', requireAuth, requireGuru, ah(async (req, res) => {
   const record = await db.prepare('SELECT * FROM attendance WHERE id = ?').get(req.params.id) as any;
   if (!record || record.className !== req.user!.className) {
     return res.status(404).json({ error: 'Data presensi tidak ditemukan.' });
-  }
-  if (record.userId !== req.user!.id && req.user!.role !== 'guru') {
-    return res.status(403).json({ error: 'Anda hanya bisa menghapus presensi milik sendiri.' });
   }
   await db.prepare('DELETE FROM attendance WHERE id = ?').run(req.params.id);
   res.status(204).end();
