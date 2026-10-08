@@ -106,10 +106,9 @@ export async function appendAttendanceRow(sheetId: string, tabName: string, row:
         name,
         email,
         toSheetDateFormat(row.date),
-        '',
+        'Valid',
         mapStatusForSheet(row.status),
         row.note ?? '',
       ]],
     },
   });
-}
