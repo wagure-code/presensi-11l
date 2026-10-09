@@ -48,6 +48,8 @@ export const api = {
     apiFetch<{ token: string; user: any }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => apiFetch('/api/auth/me'),
   updateProfile: (p: any) => apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(p) }),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    apiFetch('/api/profile/password', { method: 'PUT', body: JSON.stringify({ oldPassword, newPassword }) }),
   registerSiswa: (payload: any) => apiFetch('/api/auth/register-siswa', { method: 'POST', body: JSON.stringify(payload) }),
   students: () => apiFetch('/api/students'),
   resetStudentPassword: (id: string, password: string) =>

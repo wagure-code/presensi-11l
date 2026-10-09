@@ -118,6 +118,25 @@ app.put('/api/profile', requireAuth, ah(async (req, res) => {
   res.json(updated);
 }));
 
+// Ganti password sendiri (siswa maupun guru) — wajib verifikasi password lama dulu.
+app.put('/api/profile/password', requireAuth, ah(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ error: 'Password lama dan password baru wajib diisi.' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password baru minimal 6 karakter.' });
+  }
+
+  const user = await db.prepare('SELECT passwordHash FROM users WHERE id = ?').get(req.user!.id) as any;
+  if (!user || !bcrypt.compareSync(oldPassword, user.passwordHash)) {
+    return res.status(401).json({ error: 'Password lama salah.' });
+  }
+
+  await db.prepare('UPDATE users SET passwordHash = ? WHERE id = ?').run(bcrypt.hashSync(newPassword, 10), req.user!.id);
+  res.json({ ok: true });
+}));
+
 // Guru: list all students in their class
 app.get('/api/students', requireAuth, requireGuru, ah(async (req, res) => {
   const students = await db.prepare(`SELECT id, username, name, nis, avatarEmoji FROM users WHERE role = 'siswa' AND className = ?`).all(req.user!.className);

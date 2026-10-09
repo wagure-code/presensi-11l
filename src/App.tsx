@@ -395,6 +395,15 @@ function AppShell() {
     }
   };
 
+  // Dibiarkan melempar error ke pemanggil (ProfileModal) supaya pesan error
+  // (mis. "Password lama salah.") bisa ditampilkan inline di form, bukan cuma
+  // lewat toast yang gampang kelewatan.
+  const handleChangePassword = async (oldPassword: string, newPassword: string) => {
+    await api.changePassword(oldPassword, newPassword);
+    soundManager.playSuccess();
+    showToast('Password berhasil diganti!');
+  };
+
   const handleMarkNotificationRead = (id: string) => {
     setReadNotifIds((prev) => new Set(prev).add(id));
   };
@@ -564,7 +573,7 @@ function AppShell() {
         onNavigateToAttendance={() => setActiveTab('attendance')}
       />
 
-      <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={profile} onSaveProfile={handleSaveProfile} />
+      <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={profile} onSaveProfile={handleSaveProfile} onChangePassword={handleChangePassword} />
     </div>
   );
 }
