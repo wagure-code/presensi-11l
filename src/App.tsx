@@ -589,18 +589,40 @@ export default function App() {
 
   const showSplash = loading || !minTimeElapsed;
 
+  // Setiap cabang di bawah ini DIBUNGKUS motion.div dengan `exit` sendiri.
+  // AnimatePresence hanya tahu kapan sebuah child "selesai keluar" kalau child
+  // langsung itu adalah motion component yang punya exit animation. Sebelumnya
+  // AppShell/LoginView/RegisterClassView dirender sebagai <div> biasa (tanpa
+  // exit) — AnimatePresence tidak pernah menerima sinyal exit-complete untuk
+  // mereka, jadi secara internal tetap menahannya "hidup" dan terus
+  // me-render-ulang dengan context terbaru walau sudah tidak ada di cabang
+  // ternary ini. Itu sebabnya AppShell bisa ke-render ulang dengan `user`
+  // yang sudah null setelah logout -> crash di `user!.role` -> layar blank.
+  const fade = {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: 0.2 },
+  };
+
   return (
     <AnimatePresence mode="wait">
       {showSplash ? (
         <SplashScreen key="splash" />
       ) : !user ? (
         authMode === 'login' ? (
-          <LoginView key="login" onSwitchToRegister={() => setAuthMode('register')} />
+          <motion.div key="login" {...fade}>
+            <LoginView onSwitchToRegister={() => setAuthMode('register')} />
+          </motion.div>
         ) : (
-          <RegisterClassView key="register" onSwitchToLogin={() => setAuthMode('login')} />
+          <motion.div key="register" {...fade}>
+            <RegisterClassView onSwitchToLogin={() => setAuthMode('login')} />
+          </motion.div>
         )
       ) : (
-        <AppShell key={user.id} />
+        <motion.div key={user.id} {...fade}>
+          <AppShell />
+        </motion.div>
       )}
     </AnimatePresence>
   );

@@ -112,3 +112,4 @@ export async function appendAttendanceRow(sheetId: string, tabName: string, row:
       ]],
     },
   });
+}
