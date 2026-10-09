@@ -44,7 +44,17 @@ function todayJakarta(): string {
 
 function AppShell() {
   const { user, logout } = useAuth();
-  const isGuru = user!.role === 'guru';
+
+  // Guard pertahanan: AppShell bisa tetap ter-mount sesaat setelah `user` jadi
+  // null (mis. selagi motion.div pembungkusnya masih menjalankan animasi exit
+  // pas logout). React Context TIDAK dibekukan selama animasi exit berjalan —
+  // begitu AuthContext meng-update `user` jadi null, AppShell yang masih
+  // nyangkut di tengah animasi ikut di-render ulang dengan `user` yang sudah
+  // null. Tanpa guard ini, `user!.role` di bawah akan crash dan menjatuhkan
+  // seluruh tree React (karena tidak ada error boundary) -> layar blank.
+  if (!user) return null;
+
+  const isGuru = user.role === 'guru';
 
   const profile: StudentProfile = {
     name: user!.name,
