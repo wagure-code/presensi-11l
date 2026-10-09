@@ -444,16 +444,17 @@ export const DutyRosterView: React.FC<DutyRosterViewProps> = ({
 
               <button
                 onClick={() => onToggleDutyDone(selectedDay)}
-                className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                disabled={currentDuty.isCompletedToday}
+                className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
                   currentDuty.isCompletedToday
-                    ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                    ? 'bg-slate-100 text-slate-400 cursor-default'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer'
                 }`}
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>
                   {currentDuty.isCompletedToday
-                    ? 'Batalkan Status Selesai'
+                    ? 'Piket Sudah Selesai (Terkunci)'
                     : `Tandai Piket ${selectedDay} Selesai`}
                 </span>
               </button>

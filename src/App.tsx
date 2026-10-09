@@ -1,5 +1,5 @@
 import { RegisterClassView } from './components/RegisterClassView';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   StudentProfile,
@@ -560,23 +560,29 @@ export default function App() {
   const { user, loading } = useAuth();
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const prevUserRef = useRef<typeof user>(null);
+  const [prevUser, setPrevUser] = useState(user);
 
+  // Deteksi transisi logout (sudah-login -> belum-login) langsung di render phase,
+  // bukan di useEffect. Kalau direset lewat effect, ada 1 frame jeda di mana React
+  // sempat merender LoginView dulu (karena `user` sudah null tapi `minTimeElapsed`
+  // masih true dari sesi sebelumnya) sebelum state splash menyusul — transisi
+  // App -> Login -> Splash yang terpotong ini yang bikin AnimatePresence
+  // ("mode=wait") nyangkut dan layar jadi blank. Reset di render phase membuat
+  // React langsung re-render sebelum sempat paint, jadi tidak ada frame antara.
+  if (user !== prevUser) {
+    if (prevUser && !user) {
+      setMinTimeElapsed(false);
+    }
+    setPrevUser(user);
+  }
+
+  // Jaga splash tampil minimal 1.8 detik setiap kali minTimeElapsed di-reset,
+  // baik saat pertama kali load maupun setelah logout.
   useEffect(() => {
+    if (minTimeElapsed) return;
     const timer = setTimeout(() => setMinTimeElapsed(true), 1800);
     return () => clearTimeout(timer);
-  }, []);
-
-  // Putar ulang splash screen setiap kali user logout (pindah dari sudah-login ke belum-login)
-  useEffect(() => {
-    if (prevUserRef.current && !user) {
-      setMinTimeElapsed(false);
-      const timer = setTimeout(() => setMinTimeElapsed(true), 1800);
-      prevUserRef.current = user;
-      return () => clearTimeout(timer);
-    }
-    prevUserRef.current = user;
-  }, [user]);
+  }, [minTimeElapsed]);
 
   const showSplash = loading || !minTimeElapsed;
 
