@@ -81,4 +81,14 @@ export const api = {
 
   learningCycle: () => apiFetch('/api/learning-cycle'),
   updateLearningCycle: (c: any) => apiFetch('/api/learning-cycle', { method: 'PUT', body: JSON.stringify(c) }),
+
+    getAttendanceSheetConfig: () =>
+    apiFetch<{ sheetId: string | null; tabName: string }>('/api/settings/attendance-sheet'),
+
+  setAttendanceSheetConfig: (payload: { sheetUrl: string; tabName: string }) =>
+    apiFetch<{ sheetId: string; tabName: string }>('/api/settings/attendance-sheet', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
 };

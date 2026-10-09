@@ -166,6 +166,10 @@ CREATE TABLE IF NOT EXISTS learning_cycle (
 -- Safe to re-run: adds the column only if it doesn't already exist (covers databases
 -- that were created before this field existed).
 ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "attendanceSheetId" TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "attendanceSheetTab" TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "isAdmin" INTEGER DEFAULT 0;
+UPDATE users SET "isAdmin" = 1 WHERE username = 'Admin' AND role = 'guru';
 `);
 }
 

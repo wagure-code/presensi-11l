@@ -3,6 +3,7 @@ import { Users, UserPlus, KeyRound, Trash2, X, Copy, Check, BarChart3 } from 'lu
 import { api } from '../utils/api';
 import { StudentProfile, AttendanceRecord } from '../types';
 import { AttendanceAnalyticsPanel } from './AttendanceAnalyticsPanel';
+import { AttendanceSheetSettings } from './AttendanceSheetSettings';
 
 interface StudentRow {
   id: string;
@@ -164,12 +165,15 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({ pr
       </div>
 
       {innerTab === 'analitik' && (
-        <AttendanceAnalyticsPanel
-          attendance={attendance}
-          students={students}
-          className={profile.className}
-          onManualAdded={onManualAttendanceAdded}
-        />
+        <>
+          <AttendanceSheetSettings />
+          <AttendanceAnalyticsPanel
+            attendance={attendance}
+            students={students}
+            className={profile.className}
+            onManualAdded={onManualAttendanceAdded}
+          />
+        </>
       )}
 
       {innerTab === 'siswa' && (

@@ -38,6 +38,10 @@ const statusColors: Record<AttendanceStatus, { bg: string; text: string; border:
   alpha: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
 };
 
+// Sama kayak todayJakarta() di backend — biar "hari ini" di layar siswa konsisten
+// sama patokan yang dipakai server buat ngunci presensi hari sebelumnya.
+const getTodayJakarta = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+
 export const AttendanceView: React.FC<AttendanceViewProps> = ({
   attendance,
   profile,
@@ -48,7 +52,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   onOpenCycleModal,
 }) => {
   const activeCycle = learningCycle || initialLearningCycle;
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayJakarta();
   const todayRecord = attendance.find((a) => a.date === todayStr);
 
   const isOnline = activeCycle.currentMode === 'online';
@@ -396,7 +400,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         </div>
                       </div>
 
-                      {!isGuru && (
+                      {isGuru && (
                         <button
                           onClick={() => onDeleteAttendance(item.id)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"

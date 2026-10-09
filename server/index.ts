@@ -5,12 +5,17 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import db, { initSchema } from './db.js';
 import { signToken, requireAuth, requireGuru } from './auth.js';
+import { appendAttendanceRow, extractSheetId, formatSheetTimestamp } from './utils/googleSheets.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
+
+function todayJakarta(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+}
 
 // Wraps an async route handler so a rejected promise becomes a 500 instead of crashing the process.
 const ah = (fn: (req: Request, res: Response) => Promise<any>) => (req: Request, res: Response, next: NextFunction) => {
@@ -184,6 +189,43 @@ app.delete('/api/schedules/:id', requireAuth, requireGuru, ah(async (req, res) =
 const DUTY_DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 const DEFAULT_DUTY_TASKS = ['Menyapu Lantai', 'Membersihkan Papan Tulis', 'Membuang Sampah'];
 
+const DUTY_DAY_INDEX: Record<string, number> = {
+  Minggu: 0, Senin: 1, Selasa: 2, Rabu: 3, Kamis: 4, Jumat: 5, Sabtu: 6,
+};
+const EN_TO_ID_DAY: Record<string, string> = {
+  Mon: 'Senin', Tue: 'Selasa', Wed: 'Rabu', Thu: 'Kamis', Fri: 'Jumat', Sat: 'Sabtu', Sun: 'Minggu',
+};
+
+// Tanggal + nama hari + jam sekarang, semuanya patokan WIB.
+function getJakartaNow() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
+  }).formatToParts(new Date());
+  const map: Record<string, string> = {};
+  parts.forEach((p) => (map[p.type] = p.value));
+  return {
+    dateStr: `${map.year}-${map.month}-${map.day}`,
+    dayName: EN_TO_ID_DAY[map.weekday],
+    hour: parseInt(map.hour, 10),
+  };
+}
+
+// Tanggal kemunculan terakhir dari hari tertentu (misal "Senin") yang <= hari ini.
+// Dipakai supaya status "selesai" piket reset otomatis tiap minggu, bukan nempel selamanya.
+function mostRecentOccurrenceDate(dayName: string, todayDateStr: string): string {
+  const targetIdx = DUTY_DAY_INDEX[dayName];
+  const today = new Date(`${todayDateStr}T00:00:00`);
+  let diff = today.getDay() - targetIdx;
+  if (diff < 0) diff += 7;
+  today.setDate(today.getDate() - diff);
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // Ensure every weekday has a duty row for this class so the frontend always has something real to update.
 const ensureDefaultDuties = async (className: string) => {
   const existing = await db.prepare('SELECT day FROM duties WHERE className = ?').all(className) as any[];
@@ -198,8 +240,27 @@ const ensureDefaultDuties = async (className: string) => {
 
 app.get('/api/duties', requireAuth, ah(async (req, res) => {
   await ensureDefaultDuties(req.user!.className);
+  const { dateStr, dayName, hour } = getJakartaNow();
+
+  // Lewat jam 18:00 WIB dan piket hari ini belum ditandai selesai? Tandai otomatis.
+  if (hour >= 18) {
+    const todayRow = await db.prepare('SELECT * FROM duties WHERE className = ? AND day = ?').get(req.user!.className, dayName) as any;
+    if (todayRow && todayRow.completedDate !== dateStr) {
+      await db.prepare('UPDATE duties SET isCompletedToday = 1, completedDate = ? WHERE id = ?').run(dateStr, todayRow.id);
+    }
+  }
+
   const rows = await db.prepare('SELECT * FROM duties WHERE className = ?').all(req.user!.className) as any[];
-  res.json(rows.map((r) => ({ ...r, students: JSON.parse(r.students), tasks: JSON.parse(r.tasks), isCompletedToday: !!r.isCompletedToday })));
+  res.json(rows.map((r) => {
+    const occurrenceDate = mostRecentOccurrenceDate(r.day, dateStr);
+    const isCompletedToday = !!r.isCompletedToday && r.completedDate === occurrenceDate;
+    return {
+      ...r,
+      students: JSON.parse(r.students),
+      tasks: JSON.parse(r.tasks),
+      isCompletedToday,
+    };
+  }));
 }));
 
 app.post('/api/duties', requireAuth, requireGuru, ah(async (req, res) => {
@@ -217,13 +278,22 @@ app.put('/api/duties/:id', requireAuth, requireGuru, ah(async (req, res) => {
   res.json({ ...d, id: req.params.id });
 }));
 
-// Toggle today's duty completion status — any student in that day's roster (or guru) can do this
+// Tandai piket hari itu selesai — sekali ditandai, terkunci sampai kemunculan hari itu
+// minggu berikutnya, saat status-nya otomatis reset lagi.
 app.post('/api/duties/:id/complete', requireAuth, ah(async (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const completed = req.body?.completed !== false; // default true for backward compatibility
-  await db.prepare('UPDATE duties SET isCompletedToday = ?, completedDate = ? WHERE id = ? AND className = ?')
-    .run(completed ? 1 : 0, completed ? today : null, req.params.id, req.user!.className);
-  res.json({ ok: true, isCompletedToday: completed });
+  const duty = await db.prepare('SELECT * FROM duties WHERE id = ? AND className = ?').get(req.params.id, req.user!.className) as any;
+  if (!duty) return res.status(404).json({ error: 'Piket tidak ditemukan.' });
+
+  const { dateStr } = getJakartaNow();
+  const occurrenceDate = mostRecentOccurrenceDate(duty.day, dateStr);
+  const alreadyDone = !!duty.isCompletedToday && duty.completedDate === occurrenceDate;
+
+  if (alreadyDone) {
+    return res.status(409).json({ error: 'Piket untuk periode ini sudah ditandai selesai dan tidak bisa diubah lagi.' });
+  }
+
+  await db.prepare('UPDATE duties SET isCompletedToday = 1, completedDate = ? WHERE id = ?').run(occurrenceDate, req.params.id);
+  res.json({ ok: true, isCompletedToday: true });
 }));
 
 app.delete('/api/duties/:id', requireAuth, requireGuru, ah(async (req, res) => {
@@ -306,9 +376,13 @@ app.post('/api/attendance', requireAuth, ah(async (req, res) => {
   const a = req.body;
   const id = randomUUID();
   const now = new Date();
-  const date = a.date || now.toISOString().split('T')[0];
+  const today = todayJakarta();
+  const date = a.date || today;
+  if (date !== today) {
+    return res.status(403).json({ error: 'Presensi untuk tanggal ini sudah terkunci dan tidak bisa diubah lagi.' });
+  }
   await db.prepare('DELETE FROM attendance WHERE userId = ? AND date = ?').run(req.user!.id, date);
-  await db.prepare(`INSERT INTO attendance (id, userId, className, date, time, status, note, method, learningMode, networkStatus)
+    await db.prepare(`INSERT INTO attendance (id, userId, className, date, time, status, note, method, learningMode, networkStatus)
     VALUES (@id, @userId, @className, @date, @time, @status, @note, @method, @learningMode, @networkStatus)`)
     .run({
       id,
@@ -322,6 +396,23 @@ app.post('/api/attendance', requireAuth, ah(async (req, res) => {
       learningMode: a.learningMode || null,
       networkStatus: a.networkStatus || null,
     });
+
+  try {
+    const guru = await db.prepare(`SELECT attendanceSheetId, attendanceSheetTab FROM users WHERE role = 'guru' AND className = ? ORDER BY attendanceSheetId IS NULL ASC LIMIT 1`).get(req.user!.className) as any;
+    console.log('DEBUG sync - className siswa:', req.user!.className, '| hasil query guru:', guru);
+    if (guru?.attendanceSheetId) {
+      await appendAttendanceRow(guru.attendanceSheetId, guru.attendanceSheetTab || 'Form_Responses', {
+        timestamp: formatSheetTimestamp(now),
+        name: req.user!.name,
+        date,
+        status: a.status,
+        note: a.note || '',
+      });
+    }
+  } catch (err) {
+    console.error('Gagal sync presensi ke Google Sheet:', err);
+  }
+
   res.status(201).json({ ...a, id, date });
 }));
 
@@ -338,7 +429,7 @@ app.post('/api/attendance/manual', requireAuth, requireGuru, ah(async (req, res)
   const { studentId, date, time, status, note } = req.body;
   if (!studentId || !date || !status) return res.status(400).json({ error: 'studentId, date, dan status wajib diisi.' });
 
-  const student = await db.prepare(`SELECT id FROM users WHERE id = ? AND role = 'siswa' AND className = ?`).get(studentId, req.user!.className);
+  const student = await db.prepare(`SELECT id, name FROM users WHERE id = ? AND role = 'siswa' AND className = ?`).get(studentId, req.user!.className) as any;
   if (!student) return res.status(404).json({ error: 'Siswa tidak ditemukan di kelas ini.' });
 
   await db.prepare('DELETE FROM attendance WHERE userId = ? AND date = ?').run(studentId, date);
@@ -346,20 +437,58 @@ app.post('/api/attendance/manual', requireAuth, requireGuru, ah(async (req, res)
   await db.prepare(`INSERT INTO attendance (id, userId, className, date, time, status, note, method)
     VALUES (?, ?, ?, ?, ?, ?, ?, 'Manual Guru')`)
     .run(id, studentId, req.user!.className, date, time || '08:00:00', status, note || null);
+
+  try {
+    const sheetCfg = await db.prepare(`SELECT attendanceSheetId, attendanceSheetTab FROM users WHERE id = ?`).get(req.user!.id) as any;
+    if (sheetCfg?.attendanceSheetId) {
+      await appendAttendanceRow(sheetCfg.attendanceSheetId, sheetCfg.attendanceSheetTab || 'Form_Responses', {
+        timestamp: formatSheetTimestamp(new Date()),
+        name: student.name,
+        date,
+        status,
+        note: note || '',
+      });
+    }
+  } catch (err) {
+    console.error('Gagal sync presensi manual ke Google Sheet:', err);
+  }
+
   res.status(201).json({ id, studentId, date, time, status, note });
 }));
 
 // Delete an attendance record — only the student who submitted it, or a guru in the same class
-app.delete('/api/attendance/:id', requireAuth, ah(async (req, res) => {
+// Delete an attendance record — guru only (siswa tidak diizinkan menghapus presensi)
+app.delete('/api/attendance/:id', requireAuth, requireGuru, ah(async (req, res) => {
   const record = await db.prepare('SELECT * FROM attendance WHERE id = ?').get(req.params.id) as any;
   if (!record || record.className !== req.user!.className) {
     return res.status(404).json({ error: 'Data presensi tidak ditemukan.' });
   }
-  if (record.userId !== req.user!.id && req.user!.role !== 'guru') {
-    return res.status(403).json({ error: 'Anda hanya bisa menghapus presensi milik sendiri.' });
-  }
   await db.prepare('DELETE FROM attendance WHERE id = ?').run(req.params.id);
   res.status(204).end();
+}));
+
+// Guru: lihat/atur link Google Sheet tujuan sinkronisasi presensi
+app.get('/api/settings/attendance-sheet', requireAuth, requireGuru, ah(async (req, res) => {
+  const row = await db.prepare(`SELECT attendanceSheetId, attendanceSheetTab, isAdmin FROM users WHERE id = ?`).get(req.user!.id) as any;
+  res.json({
+    sheetId: row?.attendanceSheetId || null,
+    tabName: row?.attendanceSheetTab || 'Form_Responses',
+    isAdmin: !!row?.isAdmin,
+  });
+}));
+
+app.put('/api/settings/attendance-sheet', requireAuth, requireGuru, ah(async (req, res) => {
+  const me = await db.prepare(`SELECT isAdmin FROM users WHERE id = ?`).get(req.user!.id) as any;
+  if (!me?.isAdmin) {
+    return res.status(403).json({ error: 'Hanya akun Admin yang boleh mengubah tujuan sinkronisasi sheet.' });
+  }
+  const { sheetUrl, tabName } = req.body;
+  if (!sheetUrl) return res.status(400).json({ error: 'Link sheet wajib diisi.' });
+  const sheetId = extractSheetId(sheetUrl);
+  if (!sheetId) return res.status(400).json({ error: 'Link Google Sheet tidak valid.' });
+  await db.prepare(`UPDATE users SET attendanceSheetId = ?, attendanceSheetTab = ? WHERE id = ?`)
+    .run(sheetId, tabName || 'Form_Responses', req.user!.id);
+  res.json({ sheetId, tabName: tabName || 'Form_Responses' });
 }));
 
 // ---------- LEARNING CYCLE ----------
