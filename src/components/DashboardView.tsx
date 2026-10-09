@@ -668,15 +668,16 @@ const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).
 
                 <button
                   onClick={onToggleDutyToday}
-                  className={`w-full py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  disabled={!!todayDuty?.isCompletedToday}
+                  className={`w-full py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
                     todayDuty?.isCompletedToday
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs cursor pointer'
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>
-                    {todayDuty?.isCompletedToday ? 'Piket Hari Ini Sudah Selesai (Batal)' : 'Tandai Piket Hari Ini Selesai'}
+                    {todayDuty?.isCompletedToday ? 'Piket Hari Ini Sudah Selesai' : 'Tandai Piket Hari Ini Selesai'}
                   </span>
                 </button>
               </>

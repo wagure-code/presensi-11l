@@ -189,6 +189,43 @@ app.delete('/api/schedules/:id', requireAuth, requireGuru, ah(async (req, res) =
 const DUTY_DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 const DEFAULT_DUTY_TASKS = ['Menyapu Lantai', 'Membersihkan Papan Tulis', 'Membuang Sampah'];
 
+const DUTY_DAY_INDEX: Record<string, number> = {
+  Minggu: 0, Senin: 1, Selasa: 2, Rabu: 3, Kamis: 4, Jumat: 5, Sabtu: 6,
+};
+const EN_TO_ID_DAY: Record<string, string> = {
+  Mon: 'Senin', Tue: 'Selasa', Wed: 'Rabu', Thu: 'Kamis', Fri: 'Jumat', Sat: 'Sabtu', Sun: 'Minggu',
+};
+
+// Tanggal + nama hari + jam sekarang, semuanya patokan WIB.
+function getJakartaNow() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
+  }).formatToParts(new Date());
+  const map: Record<string, string> = {};
+  parts.forEach((p) => (map[p.type] = p.value));
+  return {
+    dateStr: `${map.year}-${map.month}-${map.day}`,
+    dayName: EN_TO_ID_DAY[map.weekday],
+    hour: parseInt(map.hour, 10),
+  };
+}
+
+// Tanggal kemunculan terakhir dari hari tertentu (misal "Senin") yang <= hari ini.
+// Dipakai supaya status "selesai" piket reset otomatis tiap minggu, bukan nempel selamanya.
+function mostRecentOccurrenceDate(dayName: string, todayDateStr: string): string {
+  const targetIdx = DUTY_DAY_INDEX[dayName];
+  const today = new Date(`${todayDateStr}T00:00:00`);
+  let diff = today.getDay() - targetIdx;
+  if (diff < 0) diff += 7;
+  today.setDate(today.getDate() - diff);
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // Ensure every weekday has a duty row for this class so the frontend always has something real to update.
 const ensureDefaultDuties = async (className: string) => {
   const existing = await db.prepare('SELECT day FROM duties WHERE className = ?').all(className) as any[];
@@ -203,8 +240,27 @@ const ensureDefaultDuties = async (className: string) => {
 
 app.get('/api/duties', requireAuth, ah(async (req, res) => {
   await ensureDefaultDuties(req.user!.className);
+  const { dateStr, dayName, hour } = getJakartaNow();
+
+  // Lewat jam 18:00 WIB dan piket hari ini belum ditandai selesai? Tandai otomatis.
+  if (hour >= 18) {
+    const todayRow = await db.prepare('SELECT * FROM duties WHERE className = ? AND day = ?').get(req.user!.className, dayName) as any;
+    if (todayRow && todayRow.completedDate !== dateStr) {
+      await db.prepare('UPDATE duties SET isCompletedToday = 1, completedDate = ? WHERE id = ?').run(dateStr, todayRow.id);
+    }
+  }
+
   const rows = await db.prepare('SELECT * FROM duties WHERE className = ?').all(req.user!.className) as any[];
-  res.json(rows.map((r) => ({ ...r, students: JSON.parse(r.students), tasks: JSON.parse(r.tasks), isCompletedToday: !!r.isCompletedToday })));
+  res.json(rows.map((r) => {
+    const occurrenceDate = mostRecentOccurrenceDate(r.day, dateStr);
+    const isCompletedToday = !!r.isCompletedToday && r.completedDate === occurrenceDate;
+    return {
+      ...r,
+      students: JSON.parse(r.students),
+      tasks: JSON.parse(r.tasks),
+      isCompletedToday,
+    };
+  }));
 }));
 
 app.post('/api/duties', requireAuth, requireGuru, ah(async (req, res) => {
@@ -222,13 +278,22 @@ app.put('/api/duties/:id', requireAuth, requireGuru, ah(async (req, res) => {
   res.json({ ...d, id: req.params.id });
 }));
 
-// Toggle today's duty completion status — any student in that day's roster (or guru) can do this
+// Tandai piket hari itu selesai — sekali ditandai, terkunci sampai kemunculan hari itu
+// minggu berikutnya, saat status-nya otomatis reset lagi.
 app.post('/api/duties/:id/complete', requireAuth, ah(async (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const completed = req.body?.completed !== false; // default true for backward compatibility
-  await db.prepare('UPDATE duties SET isCompletedToday = ?, completedDate = ? WHERE id = ? AND className = ?')
-    .run(completed ? 1 : 0, completed ? today : null, req.params.id, req.user!.className);
-  res.json({ ok: true, isCompletedToday: completed });
+  const duty = await db.prepare('SELECT * FROM duties WHERE id = ? AND className = ?').get(req.params.id, req.user!.className) as any;
+  if (!duty) return res.status(404).json({ error: 'Piket tidak ditemukan.' });
+
+  const { dateStr } = getJakartaNow();
+  const occurrenceDate = mostRecentOccurrenceDate(duty.day, dateStr);
+  const alreadyDone = !!duty.isCompletedToday && duty.completedDate === occurrenceDate;
+
+  if (alreadyDone) {
+    return res.status(409).json({ error: 'Piket untuk periode ini sudah ditandai selesai dan tidak bisa diubah lagi.' });
+  }
+
+  await db.prepare('UPDATE duties SET isCompletedToday = 1, completedDate = ? WHERE id = ?').run(occurrenceDate, req.params.id);
+  res.json({ ok: true, isCompletedToday: true });
 }));
 
 app.delete('/api/duties/:id', requireAuth, requireGuru, ah(async (req, res) => {

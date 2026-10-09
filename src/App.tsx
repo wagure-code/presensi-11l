@@ -363,18 +363,17 @@ function AppShell() {
   };
 
   const handleToggleDutyDone = async (day: DayOfWeek) => {
-    const dutyItem = duties.find((d) => d.day === day);
-    if (!dutyItem) return;
-    const nextCompleted = !dutyItem.isCompletedToday;
-    try {
-      await api.completeDuty(dutyItem.id, nextCompleted);
-      setDuties((prev) => prev.map((d) => (d.day === day ? { ...d, isCompletedToday: nextCompleted } : d)));
-      soundManager.playSuccess();
-      showToast(nextCompleted ? `Piket hari ${day} ditandai selesai! Kelas bersih & rapi ✨` : `Status piket hari ${day} dibatalkan.`);
-    } catch (e: any) {
-      showToast(e.message || 'Gagal memperbarui status piket.');
-    }
-  };
+  const dutyItem = duties.find((d) => d.day === day);
+  if (!dutyItem || dutyItem.isCompletedToday) return;
+  try {
+    await api.completeDuty(dutyItem.id, true);
+    setDuties((prev) => prev.map((d) => (d.day === day ? { ...d, isCompletedToday: true } : d)));
+    soundManager.playSuccess();
+    showToast(`Piket hari ${day} ditandai selesai! Kelas bersih & rapi ✨`);
+  } catch (e: any) {
+    showToast(e.message || 'Gagal memperbarui status piket.');
+  }
+};
 
   const handleSaveProfile = async (p: StudentProfile) => {
     try {
