@@ -85,15 +85,29 @@ export async function appendAttendanceRow(sheetId: string, tabName: string, row:
   const auth = getAuth();
   const sheets = google.sheets({ version: 'v4', auth });
 
-  // Cari baris kosong pertama lewat kolom Timestamp (A), bukan lewat heuristik append bawaan Sheets.
+  const { name, email } = resolveStudent(row.name);
+  const targetDateFormatted = toSheetDateFormat(row.date);
+
+  // Cari baris existing milik siswa yang sama di tanggal yang sama (kolom B=Email,
+  // E=Tanggal). Kalau ketemu, baris itu DITIMPA alih-alih nambah baris baru —
+  // menyamai perilaku tabel `attendance` di database (DELETE lalu INSERT per
+  // siswa per tanggal). Ini mencegah baris dobel kalau endpoint presensi
+  // terpanggil lebih dari sekali untuk hari yang sama (double-klik tombol,
+  // retry jaringan, dst).
   const existing = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: `${tabName}!A:A`,
+    range: `${tabName}!B:E`,
   });
-  const lastRow = existing.data.values?.length || 1;
-  const targetRow = lastRow + 1;
-
-  const { name, email } = resolveStudent(row.name);
+  const rows = existing.data.values || [];
+  let targetRow = rows.length + 1;
+  for (let i = 1; i < rows.length; i++) {
+    const rowEmail = rows[i]?.[0];
+    const rowDate = rows[i]?.[3];
+    if (rowEmail === email && rowDate === targetDateFormatted) {
+      targetRow = i + 1;
+      break;
+    }
+  }
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
@@ -105,11 +119,55 @@ export async function appendAttendanceRow(sheetId: string, tabName: string, row:
         email,
         name,
         email,
-        toSheetDateFormat(row.date),
+        targetDateFormatted,
         'Valid',
         mapStatusForSheet(row.status),
         row.note ?? '',
       ]],
     },
   });
+}
+
+// Bersihin baris presensi dobel yang sudah kadung ada di sheet (sebelum
+// appendAttendanceRow di atas jadi upsert). Kunci dedup: Email (kolom B) +
+// Tanggal (kolom E). Untuk kunci yang sama, baris PALING BAWAH (= paling baru
+// disubmit) yang dipertahankan, baris di atasnya dibuang.
+export async function dedupeAttendanceSheet(sheetId: string, tabName: string): Promise<{ removed: number }> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: 'v4', auth });
+
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: `${tabName}!A2:H`,
+  });
+  const rows = existing.data.values || [];
+  if (rows.length === 0) return { removed: 0 };
+
+  const lastIndexForKey = new Map<string, number>();
+  rows.forEach((r, i) => {
+    const key = `${r[1] ?? ''}|${r[4] ?? ''}`;
+    lastIndexForKey.set(key, i);
+  });
+  const keepIndices = new Set(lastIndexForKey.values());
+  const deduped = rows.filter((_, i) => keepIndices.has(i));
+  const removed = rows.length - deduped.length;
+
+  if (removed > 0) {
+    // Kosongkan seluruh rentang data lama dulu, baru tulis ulang versi bersihnya,
+    // supaya tidak ada sisa baris lama menggantung di bawah data baru.
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: sheetId,
+      range: `${tabName}!A2:H${rows.length + 1}`,
+    });
+    if (deduped.length > 0) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `${tabName}!A2:H${deduped.length + 1}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: deduped },
+      });
+    }
+  }
+
+  return { removed };
 }

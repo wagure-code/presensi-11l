@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import db, { initSchema } from './db.js';
 import { signToken, requireAuth, requireGuru } from './auth.js';
-import { appendAttendanceRow, extractSheetId, formatSheetTimestamp } from './utils/googleSheets.js';
+import { appendAttendanceRow, dedupeAttendanceSheet, extractSheetId, formatSheetTimestamp } from './utils/googleSheets.js';
 
 const app = express();
 app.use(cors());
@@ -508,6 +508,18 @@ app.put('/api/settings/attendance-sheet', requireAuth, requireGuru, ah(async (re
   await db.prepare(`UPDATE users SET attendanceSheetId = ?, attendanceSheetTab = ? WHERE id = ?`)
     .run(sheetId, tabName || 'Form_Responses', req.user!.id);
   res.json({ sheetId, tabName: tabName || 'Form_Responses' });
+}));
+
+// Guru: bersihkan baris presensi dobel di Google Sheet tujuan sinkronisasi
+// (peninggalan sebelum appendAttendanceRow jadi upsert). Aman dipanggil
+// berkali-kali — kalau sudah bersih, tidak ada yang dihapus.
+app.post('/api/settings/attendance-sheet/dedupe', requireAuth, requireGuru, ah(async (req, res) => {
+  const row = await db.prepare(`SELECT attendanceSheetId, attendanceSheetTab FROM users WHERE id = ?`).get(req.user!.id) as any;
+  if (!row?.attendanceSheetId) {
+    return res.status(400).json({ error: 'Belum ada Google Sheet yang terhubung untuk kelas ini.' });
+  }
+  const result = await dedupeAttendanceSheet(row.attendanceSheetId, row.attendanceSheetTab || 'Form_Responses');
+  res.json(result);
 }));
 
 // ---------- LEARNING CYCLE ----------

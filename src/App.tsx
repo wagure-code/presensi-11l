@@ -1,5 +1,5 @@
 import { RegisterClassView } from './components/RegisterClassView';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   StudentProfile,
@@ -87,6 +87,12 @@ function AppShell() {
   const [isCycleModalOpen, setIsCycleModalOpen] = useState(false);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Penjaga anti double-submit presensi: tanpa ini, klik dobel (atau jaringan
+  // lambat bikin orang klik lagi sambil nunggu) bisa ngirim 2+ request
+  // submitAttendance sebelum yang pertama selesai, dan tiap request bikin
+  // baris baru nyangkut di Google Sheet (lihat appendAttendanceRow).
+  const isSubmittingAttendanceRef = useRef(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -221,6 +227,16 @@ function AppShell() {
   };
 
   const handleQuickCheckIn = async () => {
+    if (isSubmittingAttendanceRef.current) return;
+    isSubmittingAttendanceRef.current = true;
+    try {
+      await doQuickCheckIn();
+    } finally {
+      isSubmittingAttendanceRef.current = false;
+    }
+  };
+
+  const doQuickCheckIn = async () => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const classStartMinutes = 8 * 60 + 15;
@@ -250,6 +266,8 @@ function AppShell() {
   };
 
   const handleSubmitAttendance = async (record: AttendanceRecord) => {
+    if (isSubmittingAttendanceRef.current) return;
+    isSubmittingAttendanceRef.current = true;
     try {
       const saved = await api.submitAttendance(record);
       setAttendance((prev) => [saved, ...prev.filter((a) => a.date !== record.date)]);
@@ -257,6 +275,8 @@ function AppShell() {
       showToast(`Status presensi (${record.status.toUpperCase()}) berhasil disimpan!`);
     } catch (e: any) {
       showToast(e.message || 'Gagal menyimpan presensi.');
+    } finally {
+      isSubmittingAttendanceRef.current = false;
     }
   };
 

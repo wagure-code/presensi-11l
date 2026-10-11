@@ -9,6 +9,8 @@ export const AttendanceSheetSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deduping, setDeduping] = useState(false);
+  const [dedupeMessage, setDedupeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     api.getAttendanceSheetConfig()
@@ -39,6 +41,24 @@ export const AttendanceSheetSettings: React.FC = () => {
       setMessage({ type: 'error', text: err?.message || 'Gagal menyimpan, coba lagi.' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDedupe = async () => {
+    setDeduping(true);
+    setDedupeMessage(null);
+    try {
+      const result = await api.dedupeAttendanceSheet();
+      setDedupeMessage({
+        type: 'success',
+        text: result.removed > 0
+          ? `${result.removed} baris dobel berhasil dihapus.`
+          : 'Nggak ada baris dobel, sheet-nya udah bersih.',
+      });
+    } catch (err: any) {
+      setDedupeMessage({ type: 'error', text: err?.message || 'Gagal membersihkan baris dobel, coba lagi.' });
+    } finally {
+      setDeduping(false);
     }
   };
 
@@ -81,6 +101,27 @@ export const AttendanceSheetSettings: React.FC = () => {
 
       {message && (
         <p className={`text-sm mt-2 ${message.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{message.text}</p>
+      )}
+
+      {savedSheetId && (
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <p className="text-xs text-slate-500 mb-2">
+            Ada presensi yang nyangkut dobel di sheet (mis. karena double-klik tombol)? Bersihkan di sini — baris
+            terbaru per siswa per tanggal akan dipertahankan, sisanya dihapus.
+          </p>
+          <button
+            onClick={handleDedupe}
+            disabled={deduping}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            {deduping ? 'Membersihkan...' : 'Bersihkan Baris Dobel'}
+          </button>
+          {dedupeMessage && (
+            <p className={`text-sm mt-2 ${dedupeMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+              {dedupeMessage.text}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

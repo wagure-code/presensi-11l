@@ -93,4 +93,7 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  dedupeAttendanceSheet: () =>
+    apiFetch<{ removed: number }>('/api/settings/attendance-sheet/dedupe', { method: 'POST' }),
+
 };
