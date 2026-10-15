@@ -182,15 +182,50 @@ const normalizeSchedule = (s: any) => ({
 
 // Simpan nama guru & mapel ke tabel tersendiri (idempotent) supaya tetap jadi
 // pilihan di dropdown walau jadwal yang memakainya sudah dihapus.
+// Di Vercel initSchema() tidak dijalankan, jadi tabel dibuat sendiri (sekali per
+// instance) saat pertama dibutuhkan, lengkap dengan backfill dari jadwal yang ada.
+let scheduleNamesReady: Promise<void> | null = null;
+const ensureScheduleNames = () => {
+  if (!scheduleNamesReady) {
+    scheduleNamesReady = db.exec(`
+      CREATE TABLE IF NOT EXISTS schedule_names (
+        "className" TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        name TEXT NOT NULL,
+        PRIMARY KEY ("className", kind, name)
+      );
+      INSERT INTO schedule_names ("className", kind, name)
+        SELECT DISTINCT "className", 'subject', TRIM(subject) FROM schedules WHERE subject IS NOT NULL AND TRIM(subject) <> ''
+        ON CONFLICT DO NOTHING;
+      INSERT INTO schedule_names ("className", kind, name)
+        SELECT DISTINCT "className", 'teacher', TRIM(teacher) FROM schedules WHERE teacher IS NOT NULL AND TRIM(teacher) <> '' AND teacher <> 'Guru Pengampu'
+        ON CONFLICT DO NOTHING;
+    `).catch((err) => {
+      scheduleNamesReady = null; // coba lagi di request berikutnya
+      throw err;
+    });
+  }
+  return scheduleNamesReady;
+};
+
+// Simpan nama guru & mapel ke tabel tersendiri (idempotent) supaya tetap jadi
+// pilihan di dropdown walau jadwal yang memakainya sudah dihapus. Kegagalan di sini
+// TIDAK boleh menggagalkan penyimpanan jadwal itu sendiri.
 const rememberScheduleNames = async (className: string, s: { subject?: string | null; teacher?: string | null }) => {
-  const ins = db.prepare('INSERT INTO schedule_names (className, kind, name) VALUES (?, ?, ?) ON CONFLICT DO NOTHING');
-  const subject = s.subject?.trim();
-  const teacher = s.teacher?.trim();
-  if (subject) await ins.run(className, 'subject', subject);
-  if (teacher && teacher !== 'Guru Pengampu') await ins.run(className, 'teacher', teacher);
+  try {
+    await ensureScheduleNames();
+    const ins = db.prepare('INSERT INTO schedule_names (className, kind, name) VALUES (?, ?, ?) ON CONFLICT DO NOTHING');
+    const subject = s.subject?.trim();
+    const teacher = s.teacher?.trim();
+    if (subject) await ins.run(className, 'subject', subject);
+    if (teacher && teacher !== 'Guru Pengampu') await ins.run(className, 'teacher', teacher);
+  } catch (err) {
+    console.error('Gagal menyimpan nama guru/mapel:', err);
+  }
 };
 
 app.get('/api/schedule-names', requireAuth, ah(async (req, res) => {
+  await ensureScheduleNames();
   const rows = await db.prepare('SELECT kind, name FROM schedule_names WHERE className = ?').all(req.user!.className) as any[];
   res.json({
     subjects: rows.filter((r) => r.kind === 'subject').map((r) => r.name),
