@@ -401,6 +401,7 @@ const normalizeHomework = (h: any) => ({
 
 app.post('/api/homeworks', requireAuth, requireGuru, ah(async (req, res) => {
   const h = normalizeHomework(req.body);
+  await rememberScheduleNames(req.user!.className, { subject: h.subject });
   const id = req.body.id || randomUUID();
   await db.prepare(`INSERT INTO homeworks (id, className, title, subject, dueDate, dueTime, priority, category, description, submissionMode, photoUrl, createdAt, createdBy)
     VALUES (@id, @className, @title, @subject, @dueDate, @dueTime, @priority, @category, @description, @submissionMode, @photoUrl, @createdAt, @createdBy)`)
@@ -410,6 +411,7 @@ app.post('/api/homeworks', requireAuth, requireGuru, ah(async (req, res) => {
 
 app.put('/api/homeworks/:id', requireAuth, requireGuru, ah(async (req, res) => {
   const h = normalizeHomework(req.body);
+  await rememberScheduleNames(req.user!.className, { subject: h.subject });
   await db.prepare(`UPDATE homeworks SET title=@title, subject=@subject, dueDate=@dueDate, dueTime=@dueTime,
     priority=@priority, category=@category, description=@description, submissionMode=@submissionMode, photoUrl=@photoUrl
     WHERE id=@id AND className=@className`)

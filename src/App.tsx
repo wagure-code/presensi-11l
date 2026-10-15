@@ -329,10 +329,12 @@ function AppShell() {
       if (exists) {
         const saved = await api.updateHomework(hw.id, hw);
         setHomeworks((prev) => prev.map((h) => (h.id === hw.id ? { ...h, ...saved } : h)));
+        rememberNames({ subject: hw.subject });
         showToast('Perubahan tugas berhasil disimpan.');
       } else {
         const saved = await api.createHomework(hw);
         setHomeworks((prev) => [{ ...hw, ...saved, completed: false }, ...prev]);
+        rememberNames({ subject: hw.subject });
         soundManager.playNotification();
         showToast(`Tugas baru "${hw.title}" berhasil ditambahkan.`);
       }
@@ -358,7 +360,7 @@ function AppShell() {
     setIsAddHomeworkOpen(true);
   };
 
-  const rememberNames = (item: SubjectSchedule) => {
+  const rememberNames = (item: { subject?: string; teacher?: string }) => {
     const subject = item.subject?.trim();
     const teacher = item.teacher?.trim();
     setSavedNames((prev) => ({
@@ -600,7 +602,7 @@ function AppShell() {
         )}
       </AnimatePresence>
 
-      <AddHomeworkModal isOpen={isAddHomeworkOpen} onClose={() => setIsAddHomeworkOpen(false)} onSave={handleSaveHomework} editingItem={editingHomework} />
+      <AddHomeworkModal savedSubjects={savedNames.subjects} isOpen={isAddHomeworkOpen} onClose={() => setIsAddHomeworkOpen(false)} onSave={handleSaveHomework} editingItem={editingHomework} />
 
       <LearningCycleModal
         isOpen={isCycleModalOpen}

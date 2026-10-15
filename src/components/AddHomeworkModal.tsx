@@ -8,6 +8,7 @@ interface AddHomeworkModalProps {
   onClose: () => void;
   onSave: (homework: Homework) => void;
   editingItem?: Homework | null;
+  savedSubjects?: string[];
 }
 
 const COMMON_SUBJECTS = [
@@ -39,7 +40,10 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
   onClose,
   onSave,
   editingItem,
+  savedSubjects = [],
 }) => {
+  // Mapel bawaan + mapel kustom yang pernah diketik (tersimpan di database)
+  const subjectList = Array.from(new Set([...COMMON_SUBJECTS, ...savedSubjects.filter(Boolean)]));
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState(COMMON_SUBJECTS[0]);
   const [customSubject, setCustomSubject] = useState('');
@@ -58,7 +62,7 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
   useEffect(() => {
     if (editingItem) {
       setTitle(editingItem.title);
-      if (COMMON_SUBJECTS.includes(editingItem.subject)) {
+      if (subjectList.includes(editingItem.subject)) {
         setSubject(editingItem.subject);
         setCustomSubject('');
       } else {
@@ -201,7 +205,7 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
                 onChange={(e) => setSubject(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white text-slate-800 focus:outline-hidden focus:border-indigo-500"
               >
-                {COMMON_SUBJECTS.map((s) => (
+                {subjectList.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
                 <option value="Lainnya">Lainnya (Tulis Sendiri)</option>
