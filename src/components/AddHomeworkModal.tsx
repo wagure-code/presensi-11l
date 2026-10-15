@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, AlertTriangle, BookOpen, FileText, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react';
 import { Homework, TaskPriority, TaskCategory } from '../types';
 import { uploadHomeworkPhoto } from '../utils/supabaseClient';
+import { parsePhotoUrls, serializePhotoUrls, MAX_HOMEWORK_PHOTOS } from '../utils/photos';
 
 interface AddHomeworkModalProps {
   isOpen: boolean;
@@ -53,9 +54,8 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
   const [category, setCategory] = useState<TaskCategory>('PR Individu');
   const [description, setDescription] = useState('');
 
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | undefined>(undefined);
+  const [newPhotos, setNewPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -74,9 +74,8 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
       setPriority(editingItem.priority);
       setCategory(editingItem.category);
       setDescription(editingItem.description || '');
-      setExistingPhotoUrl(editingItem.photoUrl);
-      setPhotoFile(null);
-      setPhotoPreview(null);
+      setExistingPhotos(parsePhotoUrls(editingItem.photoUrl));
+      setNewPhotos([]);
     } else {
       // Defaults for new
       const tomorrow = new Date();
@@ -93,27 +92,35 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
       setPriority('sedang');
       setCategory('PR Individu');
       setDescription('');
-      setExistingPhotoUrl(undefined);
-      setPhotoFile(null);
-      setPhotoPreview(null);
+      setExistingPhotos([]);
+      setNewPhotos([]);
     }
     setUploadError(null);
   }, [editingItem, isOpen]);
 
   if (!isOpen) return null;
 
+  const totalPhotos = existingPhotos.length + newPhotos.length;
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
-    setUploadError(null);
+    const files: File[] = Array.from(e.target.files ?? []) as File[];
+    e.target.value = ''; // supaya file yang sama bisa dipilih lagi
+    if (files.length === 0) return;
+    const room = MAX_HOMEWORK_PHOTOS - totalPhotos;
+    const accepted = files.slice(0, Math.max(room, 0));
+    setNewPhotos((prev) => [...prev, ...accepted.map((file) => ({ file, preview: URL.createObjectURL(file) }))]);
+    setUploadError(
+      files.length > accepted.length ? `Maksimal ${MAX_HOMEWORK_PHOTOS} foto per tugas.` : null
+    );
   };
 
-  const handleRemovePhoto = () => {
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    setExistingPhotoUrl(undefined);
+  const handleRemoveExisting = (url: string) => {
+    setExistingPhotos((prev) => prev.filter((u) => u !== url));
+  };
+
+  const handleRemoveNew = (preview: string) => {
+    setNewPhotos((prev) => prev.filter((p) => p.preview !== preview));
+    URL.revokeObjectURL(preview);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,12 +129,13 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
 
     const chosenSubject = subject === 'Lainnya' ? customSubject.trim() || 'Umum' : subject;
 
-    let photoUrl = existingPhotoUrl;
-    if (photoFile) {
+    let photoUrl = serializePhotoUrls(existingPhotos);
+    if (newPhotos.length > 0) {
       setIsUploading(true);
       setUploadError(null);
       try {
-        photoUrl = await uploadHomeworkPhoto(photoFile);
+        const uploaded = await Promise.all(newPhotos.map((p) => uploadHomeworkPhoto(p.file)));
+        photoUrl = serializePhotoUrls([...existingPhotos, ...uploaded]);
       } catch (err: any) {
         setUploadError(err.message || 'Gagal mengunggah foto.');
         setIsUploading(false);
@@ -316,35 +324,53 @@ export const AddHomeworkModal: React.FC<AddHomeworkModalProps> = ({
           {/* Lampiran Foto */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Lampiran Foto (Opsional)
+              Lampiran Foto (Opsional, maks. 5)
             </label>
             <p className="text-[11px] text-slate-400 mb-2">
               Contoh: foto papan tulis atau lembar soal yang diberikan.
             </p>
 
-            {(photoPreview || existingPhotoUrl) ? (
-              <div className="relative inline-block">
-                <img
-                  src={photoPreview || existingPhotoUrl}
-                  alt="Lampiran tugas"
-                  className="max-h-40 rounded-xl border border-slate-200 object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={handleRemovePhoto}
-                  className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md cursor-pointer"
-                  title="Hapus foto"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+            {totalPhotos > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {existingPhotos.map((url) => (
+                  <div key={url} className="relative">
+                    <img src={url} alt="Lampiran tugas" className="h-24 w-24 rounded-xl border border-slate-200 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExisting(url)}
+                      className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md cursor-pointer"
+                      title="Hapus foto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {newPhotos.map((p) => (
+                  <div key={p.preview} className="relative">
+                    <img src={p.preview} alt="Lampiran baru" className="h-24 w-24 rounded-xl border border-slate-200 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveNew(p.preview)}
+                      className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md cursor-pointer"
+                      title="Hapus foto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : (
+            )}
+
+            {totalPhotos < MAX_HOMEWORK_PHOTOS && (
               <label className="flex items-center justify-center gap-2 px-4 py-6 rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 cursor-pointer transition-colors">
                 <ImageIcon className="w-5 h-5 text-slate-400" />
-                <span className="text-xs font-semibold text-slate-500">Klik untuk pilih foto</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  {totalPhotos > 0 ? 'Tambah foto lagi' : 'Klik untuk pilih foto (bisa lebih dari 1)'}
+                </span>
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handlePhotoChange}
                   className="hidden"
                 />

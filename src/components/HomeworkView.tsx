@@ -1,3 +1,4 @@
+import { parsePhotoUrls } from '../utils/photos';
 import React, { useState, useMemo } from 'react';
 import { 
   Plus, 
@@ -341,20 +342,18 @@ export const HomeworkView: React.FC<HomeworkViewProps> = ({
                           {hw.description}
                         </p>
                       )}
-                      {hw.photoUrl && (
-                        
-                        <a
-                          href={hw.photoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block mt-2"
-                        >
-                          <img
-                            src={hw.photoUrl}
-                            alt="Lampiran tugas"
-                            className="max-h-28 rounded-lg border border-slate-200 hover:opacity-90 transition-opacity object-cover"
-                          />
-                        </a>
+                      {parsePhotoUrls(hw.photoUrl).length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {parsePhotoUrls(hw.photoUrl).map((url) => (
+                            <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="inline-block">
+                              <img
+                                src={url}
+                                alt="Lampiran tugas"
+                                className="max-h-28 rounded-lg border border-slate-200 hover:opacity-90 transition-opacity object-cover"
+                              />
+                            </a>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
