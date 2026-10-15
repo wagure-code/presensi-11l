@@ -24,6 +24,8 @@ import { ClipboardPaste } from 'lucide-react';
 
 interface ScheduleViewProps {
   schedules: SubjectSchedule[];
+  savedSubjects?: string[];
+  savedTeachers?: string[];
   onAddSchedule: (schedule: SubjectSchedule) => void;
   onDeleteSchedule: (id: string) => void;
   onEditSchedule: (schedule: SubjectSchedule) => void;
@@ -36,6 +38,8 @@ const COLOR_ROTATION = ['blue', 'emerald', 'amber', 'indigo', 'rose', 'teal', 'p
 
 export const ScheduleView: React.FC<ScheduleViewProps> = ({
   schedules,
+  savedSubjects = [],
+  savedTeachers = [],
   onAddSchedule,
   onDeleteSchedule,
   onEditSchedule,
@@ -65,12 +69,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
   // Daftar mapel & guru yang pernah diinput sebelumnya — dipakai sebagai pilihan dropdown
   const subjectOptions = useMemo(
-    () => Array.from(new Set(schedules.map((s) => s.subject).filter(Boolean))).sort(),
-    [schedules]
+    () => Array.from(new Set([...savedSubjects, ...schedules.map((s) => s.subject)].filter(Boolean))).sort(),
+    [schedules, savedSubjects]
   );
   const teacherOptions = useMemo(
-    () => Array.from(new Set(schedules.map((s) => s.teacher).filter(Boolean))).sort(),
-    [schedules]
+    () => Array.from(new Set([...savedTeachers, ...schedules.map((s) => s.teacher)].filter(Boolean))).sort(),
+    [schedules, savedTeachers]
   );
 
   const openAddModal = (item?: SubjectSchedule) => {

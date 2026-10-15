@@ -101,6 +101,15 @@ CREATE TABLE IF NOT EXISTS schedules (
   "onlinePlatform" TEXT
 );
 
+-- Daftar nama guru & mapel yang pernah dipakai, disimpan TERPISAH dari tabel
+-- schedules supaya tidak ikut hilang saat baris jadwal dihapus/direset.
+CREATE TABLE IF NOT EXISTS schedule_names (
+  "className" TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  name TEXT NOT NULL,
+  PRIMARY KEY ("className", kind, name)
+);
+
 CREATE TABLE IF NOT EXISTS duties (
   id TEXT PRIMARY KEY,
   "className" TEXT NOT NULL,
@@ -169,6 +178,13 @@ ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "attendanceSheetId" TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "attendanceSheetTab" TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "isAdmin" INTEGER DEFAULT 0;
+-- Backfill: ambil nama dari jadwal yang sudah ada (aman diulang).
+INSERT INTO schedule_names ("className", kind, name)
+  SELECT DISTINCT "className", 'subject', TRIM(subject) FROM schedules WHERE subject IS NOT NULL AND TRIM(subject) <> ''
+  ON CONFLICT DO NOTHING;
+INSERT INTO schedule_names ("className", kind, name)
+  SELECT DISTINCT "className", 'teacher', TRIM(teacher) FROM schedules WHERE teacher IS NOT NULL AND TRIM(teacher) <> '' AND teacher <> 'Guru Pengampu'
+  ON CONFLICT DO NOTHING;
 UPDATE users SET "isAdmin" = 1 WHERE username = 'Admin' AND role = 'guru';
 `);
 }

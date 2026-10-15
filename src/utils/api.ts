@@ -57,6 +57,7 @@ export const api = {
   deleteStudent: (id: string) => apiFetch(`/api/students/${id}`, { method: 'DELETE' }),
 
   schedules: () => apiFetch('/api/schedules'),
+  scheduleNames: () => apiFetch<{ subjects: string[]; teachers: string[] }>('/api/schedule-names'),
   createSchedule: (s: any) => apiFetch('/api/schedules', { method: 'POST', body: JSON.stringify(s) }),
   updateSchedule: (id: string, s: any) => apiFetch(`/api/schedules/${id}`, { method: 'PUT', body: JSON.stringify(s) }),
   deleteSchedule: (id: string) => apiFetch(`/api/schedules/${id}`, { method: 'DELETE' }),

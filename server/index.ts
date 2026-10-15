@@ -180,8 +180,27 @@ const normalizeSchedule = (s: any) => ({
   onlinePlatform: s.onlinePlatform ?? null,
 });
 
+// Simpan nama guru & mapel ke tabel tersendiri (idempotent) supaya tetap jadi
+// pilihan di dropdown walau jadwal yang memakainya sudah dihapus.
+const rememberScheduleNames = async (className: string, s: { subject?: string | null; teacher?: string | null }) => {
+  const ins = db.prepare('INSERT INTO schedule_names (className, kind, name) VALUES (?, ?, ?) ON CONFLICT DO NOTHING');
+  const subject = s.subject?.trim();
+  const teacher = s.teacher?.trim();
+  if (subject) await ins.run(className, 'subject', subject);
+  if (teacher && teacher !== 'Guru Pengampu') await ins.run(className, 'teacher', teacher);
+};
+
+app.get('/api/schedule-names', requireAuth, ah(async (req, res) => {
+  const rows = await db.prepare('SELECT kind, name FROM schedule_names WHERE className = ?').all(req.user!.className) as any[];
+  res.json({
+    subjects: rows.filter((r) => r.kind === 'subject').map((r) => r.name),
+    teachers: rows.filter((r) => r.kind === 'teacher').map((r) => r.name),
+  });
+}));
+
 app.post('/api/schedules', requireAuth, requireGuru, ah(async (req, res) => {
   const s = normalizeSchedule(req.body);
+  await rememberScheduleNames(req.user!.className, s);
   const id = req.body.id || randomUUID();
   await db.prepare(`INSERT INTO schedules (id, className, day, startTime, endTime, subject, teacher, room, colorTag, onlineMeetingUrl, onlinePlatform)
     VALUES (@id, @className, @day, @startTime, @endTime, @subject, @teacher, @room, @colorTag, @onlineMeetingUrl, @onlinePlatform)`)
@@ -191,6 +210,7 @@ app.post('/api/schedules', requireAuth, requireGuru, ah(async (req, res) => {
 
 app.put('/api/schedules/:id', requireAuth, requireGuru, ah(async (req, res) => {
   const s = normalizeSchedule(req.body);
+  await rememberScheduleNames(req.user!.className, s);
   await db.prepare(`UPDATE schedules SET day=@day, startTime=@startTime, endTime=@endTime, subject=@subject, teacher=@teacher,
     room=@room, colorTag=@colorTag, onlineMeetingUrl=@onlineMeetingUrl, onlinePlatform=@onlinePlatform
     WHERE id=@id AND className=@className`)

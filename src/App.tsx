@@ -67,6 +67,7 @@ function AppShell() {
 
   const [dataLoading, setDataLoading] = useState(true);
   const [schedules, setSchedules] = useState<SubjectSchedule[]>([]);
+  const [savedNames, setSavedNames] = useState<{ subjects: string[]; teachers: string[] }>({ subjects: [], teachers: [] });
   const [duties, setDuties] = useState<CleaningDuty[]>([]);
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
@@ -118,10 +119,12 @@ function AppShell() {
       api.homeworks(),
       isGuru ? api.attendanceAll() : api.attendance(),
       api.learningCycle(),
+      api.scheduleNames().catch(() => ({ subjects: [], teachers: [] })),
     ])
-      .then(([s, d, h, a, c]) => {
+      .then(([s, d, h, a, c, names]) => {
         if (cancelled) return;
         setSchedules(s);
+        setSavedNames(names);
         setDuties(d);
         setHomeworks(h);
         setAttendance(a);
@@ -346,11 +349,24 @@ function AppShell() {
     setIsAddHomeworkOpen(true);
   };
 
+  const rememberNames = (item: SubjectSchedule) => {
+    const subject = item.subject?.trim();
+    const teacher = item.teacher?.trim();
+    setSavedNames((prev) => ({
+      subjects: subject && !prev.subjects.includes(subject) ? [...prev.subjects, subject] : prev.subjects,
+      teachers:
+        teacher && teacher !== 'Guru Pengampu' && !prev.teachers.includes(teacher)
+          ? [...prev.teachers, teacher]
+          : prev.teachers,
+    }));
+  };
+
   const handleAddSchedule = async (item: SubjectSchedule) => {
     if (denyIfNotGuru()) return;
     try {
       const saved = await api.createSchedule(item);
       setSchedules((prev) => [...prev, { ...item, ...saved }]);
+      rememberNames(item);
       showToast(`Mata pelajaran "${item.subject}" ditambahkan.`);
     } catch (e: any) {
       showToast(e.message || 'Gagal menambah jadwal.');
@@ -362,6 +378,7 @@ function AppShell() {
     try {
       await api.updateSchedule(item.id, item);
       setSchedules((prev) => prev.map((s) => (s.id === item.id ? item : s)));
+      rememberNames(item);
       showToast('Jadwal pelajaran diperbarui.');
     } catch (e: any) {
       showToast(e.message || 'Gagal memperbarui jadwal.');
@@ -496,6 +513,8 @@ function AppShell() {
             <motion.div key="schedule" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
               <ScheduleView
                 schedules={schedules}
+                savedSubjects={savedNames.subjects}
+                savedTeachers={savedNames.teachers}
                 onAddSchedule={handleAddSchedule}
                 onDeleteSchedule={handleDeleteSchedule}
                 onEditSchedule={handleEditSchedule}
