@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAttendanceOpen, ATTENDANCE_OPEN_LABEL } from '../utils/attendanceWindow';
 import {
   UserCheck,
   CheckCircle2,
@@ -52,6 +53,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   onOpenCycleModal,
 }) => {
   const activeCycle = learningCycle || initialLearningCycle;
+  const attendanceOpen = useAttendanceOpen();
   const todayStr = getTodayJakarta();
   const todayRecord = attendance.find((a) => a.date === todayStr);
 
@@ -80,6 +82,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!attendanceOpen) return;
     const now = new Date();
     const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -298,10 +301,15 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   <div className="flex gap-2">
                     <button
                       type="submit"
-                      className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      disabled={!attendanceOpen}
+                      className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
                     >
                       <UserCheck className="w-4 h-4" />
-                      <span>{todayRecord ? 'Perbarui Status Presensi' : 'Kirim Presensi Hadir'}</span>
+                      <span>
+                        {!attendanceOpen
+                          ? `Presensi dibuka pukul ${ATTENDANCE_OPEN_LABEL} WIB`
+                          : todayRecord ? 'Perbarui Status Presensi' : 'Kirim Presensi Hadir'}
+                      </span>
                     </button>
                   </div>
                 </form>

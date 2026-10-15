@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAttendanceOpen, ATTENDANCE_OPEN_LABEL } from '../utils/attendanceWindow';
 import { 
   CheckCircle2, 
   Clock, 
@@ -67,6 +68,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onToggleDutyToday,
   onOpenCycleModal,
 }) => {
+  const attendanceOpen = useAttendanceOpen();
   const activeCycle = learningCycle || initialLearningCycle;
   const todayDay = getCurrentIndonesianDay();
 const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
@@ -142,10 +144,11 @@ const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).
               <button
                 id="hero-btn-presensi"
                 onClick={onQuickCheckIn}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+                disabled={!attendanceOpen}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer disabled:bg-slate-600 disabled:text-slate-300 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none"
               >
                 <UserCheck className="w-4 h-4" />
-                <span>Isi Presensi Sekarang</span>
+                <span>{attendanceOpen ? 'Isi Presensi Sekarang' : `Presensi dibuka ${ATTENDANCE_OPEN_LABEL} WIB`}</span>
               </button>
             ) : (
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-xs sm:text-sm font-semibold">
@@ -723,9 +726,10 @@ const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).
                 </p>
                 <button
                   onClick={onQuickCheckIn}
-                  className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                  disabled={!attendanceOpen}
+                  className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
                 >
-                  Isi Presensi Sekarang
+                  {attendanceOpen ? 'Isi Presensi Sekarang' : `Presensi dibuka pukul ${ATTENDANCE_OPEN_LABEL} WIB`}
                 </button>
               </div>
             ) : (

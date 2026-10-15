@@ -448,6 +448,13 @@ app.get('/api/attendance', requireAuth, ah(async (req, res) => {
 // Siswa submits their own presensi for the day (replaces any existing record for that date)
 app.post('/api/attendance', requireAuth, ah(async (req, res) => {
   const a = req.body;
+  if (req.user!.role === 'siswa') {
+    const jk = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    const mins = (Number(jk.find((p) => p.type === 'hour')?.value) % 24) * 60 + Number(jk.find((p) => p.type === 'minute')?.value);
+    if (mins < 7 * 60 + 45) {
+      return res.status(403).json({ error: 'Presensi baru dibuka pukul 07.45 WIB.' });
+    }
+  }
   const id = randomUUID();
   const now = new Date();
   const today = todayJakarta();
