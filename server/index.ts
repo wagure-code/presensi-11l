@@ -451,8 +451,18 @@ app.get('/api/attendance', requireAuth, ah(async (req, res) => {
 app.post('/api/attendance', requireAuth, ah(async (req, res) => {
   const a = req.body;
   if (req.user!.role === 'siswa') {
-    const jk = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
-    const mins = (Number(jk.find((p) => p.type === 'hour')?.value) % 24) * 60 + Number(jk.find((p) => p.type === 'minute')?.value);
+    const jk = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    const part = (t: string) => jk.find((p) => p.type === t)?.value ?? '';
+    const mins = (Number(part('hour')) % 24) * 60 + Number(part('minute'));
+    const isWeekend = part('weekday') === 'Sat' || part('weekday') === 'Sun';
+    const cycle = await db.prepare('SELECT currentMode FROM learning_cycle WHERE className = ?').get(req.user!.className) as any;
+    const isOnline = (cycle?.currentMode ?? 'online') !== 'offline';
+    if (isOnline && isWeekend) {
+      return res.status(403).json({ error: 'Presensi ditutup di hari Sabtu & Minggu (mode daring).' });
+    }
+    if (!isOnline && !isWeekend) {
+      return res.status(403).json({ error: 'Mode tatap muka: presensi hanya dibuka Sabtu & Minggu.' });
+    }
     if (mins < 7 * 60 + 45) {
       return res.status(403).json({ error: 'Presensi baru dibuka pukul 07.45 WIB.' });
     }

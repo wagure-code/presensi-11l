@@ -10,7 +10,7 @@ import {
   DayOfWeek,
   LearningCycleState
 } from './types';
-import { isAttendanceOpen, jakartaMinutesNow, ATTENDANCE_OPEN_LABEL } from './utils/attendanceWindow';
+import { getAttendanceGate, jakartaMinutesNow } from './utils/attendanceWindow';
 import { api } from './utils/api';
 import { useAuth } from './context/AuthContext';
 import { LoginView } from './components/LoginView';
@@ -241,8 +241,9 @@ function AppShell() {
   };
 
   const doQuickCheckIn = async () => {
-    if (!isAttendanceOpen()) {
-      showToast(`Presensi baru dibuka pukul ${ATTENDANCE_OPEN_LABEL} WIB.`);
+    const gate = getAttendanceGate(learningCycle.currentMode);
+    if (!gate.open) {
+      showToast(gate.message);
       return;
     }
     const now = new Date();
@@ -274,8 +275,9 @@ function AppShell() {
   };
 
   const handleSubmitAttendance = async (record: AttendanceRecord) => {
-    if (!isAttendanceOpen()) {
-      showToast(`Presensi baru dibuka pukul ${ATTENDANCE_OPEN_LABEL} WIB.`);
+    const gate = getAttendanceGate(learningCycle.currentMode);
+    if (!gate.open) {
+      showToast(gate.message);
       return;
     }
     if (isSubmittingAttendanceRef.current) return;

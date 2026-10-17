@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAttendanceOpen, ATTENDANCE_OPEN_LABEL } from '../utils/attendanceWindow';
+import { useAttendanceGate } from '../utils/attendanceWindow';
 import {
   UserCheck,
   CheckCircle2,
@@ -53,7 +53,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   onOpenCycleModal,
 }) => {
   const activeCycle = learningCycle || initialLearningCycle;
-  const attendanceOpen = useAttendanceOpen();
+  const gate = useAttendanceGate(activeCycle.currentMode);
+  const attendanceOpen = gate.open;
   const todayStr = getTodayJakarta();
   const todayRecord = attendance.find((a) => a.date === todayStr);
 
@@ -307,7 +308,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       <UserCheck className="w-4 h-4" />
                       <span>
                         {!attendanceOpen
-                          ? `Presensi dibuka pukul ${ATTENDANCE_OPEN_LABEL} WIB`
+                          ? gate.message
                           : todayRecord ? 'Perbarui Status Presensi' : 'Kirim Presensi Hadir'}
                       </span>
                     </button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import logo from '../assets/logo.png';
-import { useAttendanceOpen, ATTENDANCE_OPEN_LABEL } from '../utils/attendanceWindow';
+import { useAttendanceGate } from '../utils/attendanceWindow';
 import { 
   Bell, 
   Volume2, 
@@ -44,7 +44,8 @@ export const Header: React.FC<HeaderProps> = ({
   learningCycle,
   onOpenCycleModal,
 }) => {
-  const attendanceOpen = useAttendanceOpen();
+  const gate = useAttendanceGate(learningCycle?.currentMode);
+  const attendanceOpen = gate.open;
   const activeCycle = learningCycle || initialLearningCycle;
   const [currentTime, setCurrentTime] = useState(new Date());
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -150,10 +151,10 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={onQuickCheckIn}
                 disabled={!attendanceOpen}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:hover:bg-slate-200"
-                title={attendanceOpen ? 'Presensi Hadir Hari Ini' : `Presensi baru dibuka pukul ${ATTENDANCE_OPEN_LABEL} WIB`}
+                title={attendanceOpen ? 'Presensi Hadir Hari Ini' : gate.message}
               >
                 <CalendarCheck className="w-3.5 h-3.5" />
-                <span>{attendanceOpen ? 'Presensi Hari Ini' : `Buka ${ATTENDANCE_OPEN_LABEL}`}</span>
+                <span>{attendanceOpen ? 'Presensi Hari Ini' : gate.short}</span>
               </button>
             ) : (
               <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
