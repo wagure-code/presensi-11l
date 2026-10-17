@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 // Aturan kapan presensi siswa boleh diisi (semua waktu dihitung WIB):
 // - Jam: baru bisa mulai 07.45.
 // - Mode daring (online)      : Sabtu & Minggu DITUTUP.
-// - Mode tatap muka (offline) : HANYA Sabtu & Minggu yang dibuka.
+// - Mode tatap muka (offline) : semua hari dibuka.
 export const ATTENDANCE_OPEN_HOUR = 7;
 export const ATTENDANCE_OPEN_MINUTE = 45;
 export const ATTENDANCE_OPEN_LABEL = '07.45';
@@ -43,9 +43,6 @@ export function getAttendanceGate(mode: AttendanceMode, now: Date = new Date()):
 
   if (isOnline && isWeekend) {
     return { open: false, message: 'Presensi ditutup di hari Sabtu & Minggu (mode daring).', short: 'Tutup Sabtu/Minggu' };
-  }
-  if (!isOnline && !isWeekend) {
-    return { open: false, message: 'Mode tatap muka: presensi hanya dibuka Sabtu & Minggu.', short: 'Buka Sabtu/Minggu' };
   }
   if (minutes < ATTENDANCE_OPEN_HOUR * 60 + ATTENDANCE_OPEN_MINUTE) {
     return {

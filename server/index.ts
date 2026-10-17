@@ -460,9 +460,6 @@ app.post('/api/attendance', requireAuth, ah(async (req, res) => {
     if (isOnline && isWeekend) {
       return res.status(403).json({ error: 'Presensi ditutup di hari Sabtu & Minggu (mode daring).' });
     }
-    if (!isOnline && !isWeekend) {
-      return res.status(403).json({ error: 'Mode tatap muka: presensi hanya dibuka Sabtu & Minggu.' });
-    }
     if (mins < 7 * 60 + 45) {
       return res.status(403).json({ error: 'Presensi baru dibuka pukul 07.45 WIB.' });
     }
