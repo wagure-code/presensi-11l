@@ -14,6 +14,8 @@ const DAY_MAP: Record<string, DayOfWeek> = {
   jmt: 'Jumat',
   sabtu: 'Sabtu',
   sab: 'Sabtu',
+  minggu: 'Minggu',
+  ahad: 'Minggu',
 };
 
 const DAY_NAMES = Object.keys(DAY_MAP).sort((a, b) => b.length - a.length);

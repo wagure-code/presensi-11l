@@ -33,7 +33,9 @@ interface ScheduleViewProps {
   onOpenCycleModal?: () => void;
 }
 
-const DAYS: DayOfWeek[] = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const WEEKDAYS: DayOfWeek[] = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+// Hari Minggu hanya muncul di mode tatap muka (offline).
+const WEEKDAYS_WITH_SUNDAY: DayOfWeek[] = [...WEEKDAYS, 'Minggu'];
 const COLOR_ROTATION = ['blue', 'emerald', 'amber', 'indigo', 'rose', 'teal', 'purple'];
 
 export const ScheduleView: React.FC<ScheduleViewProps> = ({
@@ -48,12 +50,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 }) => {
   const activeCycle = learningCycle || initialLearningCycle;
   const currentDay = getCurrentIndonesianDay();
-  const [selectedDay, setSelectedDay] = useState<DayOfWeek>(currentDay);
+  const [selectedDayRaw, setSelectedDay] = useState<DayOfWeek>(currentDay);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<SubjectSchedule | null>(null);
 
   const isOnline = activeCycle.currentMode === 'online';
+  const DAYS = isOnline ? WEEKDAYS : WEEKDAYS_WITH_SUNDAY;
+  // Kalau mode berganti ke daring saat tab Minggu terbuka, jatuh balik ke hari pertama.
+  const selectedDay: DayOfWeek = DAYS.includes(selectedDayRaw) ? selectedDayRaw : DAYS[0];
 
   // Form states
   const [formSubject, setFormSubject] = useState('');
