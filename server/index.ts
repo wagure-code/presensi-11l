@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import db, { initSchema } from './db.js';
 import { signToken, requireAuth, requireGuru } from './auth.js';
+import { autoMarkAttendanceForClass, autoMarkAttendanceAllClasses } from './utils/autoAttendance.js';
 import { appendAttendanceRow, dedupeAttendanceSheet, extractSheetId, formatSheetTimestamp } from './utils/googleSheets.js';
 
 const app = express();
@@ -437,7 +438,22 @@ app.post('/api/homeworks/:id/toggle', requireAuth, ah(async (req, res) => {
 // ---------- ATTENDANCE (presensi) ----------
 
 // Siswa sees own attendance; guru sees whole class (pass ?all=1)
+// Dipanggil terjadwal (Vercel Cron) untuk mencatat siswa yang lupa presensi sampai jam 11 (mode tatap muka).
+app.get('/api/cron/auto-attendance', ah(async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  if (secret && req.headers.authorization !== `Bearer ${secret}`) {
+    return res.status(401).json({ error: 'Tidak diizinkan.' });
+  }
+  res.json(await autoMarkAttendanceAllClasses());
+}));
+
 app.get('/api/attendance', requireAuth, ah(async (req, res) => {
+  // Jaring pengaman selain cron: begitu ada yang membuka aplikasi setelah jam 11, catat otomatis.
+  try {
+    await autoMarkAttendanceForClass(req.user!.className);
+  } catch (err) {
+    console.error('Gagal presensi otomatis:', err);
+  }
   if (req.user!.role === 'guru' && req.query.all) {
     const rows = await db.prepare(`SELECT a.*, u.name as studentName FROM attendance a JOIN users u ON u.id = a.userId
       WHERE a.className = ? ORDER BY a.date DESC`).all(req.user!.className);
