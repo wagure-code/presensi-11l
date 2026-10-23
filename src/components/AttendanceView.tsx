@@ -18,6 +18,7 @@ import {
   Users
 } from 'lucide-react';
 import { AttendanceRecord, AttendanceStatus, StudentProfile, LearningCycleState } from '../types';
+import { TodayAttendanceSummary, ClassStudent } from './TodayAttendanceSummary';
 import { initialLearningCycle } from '../data/initialData';
 import { formatIndonesianFullDate, formatShortDateIndo } from '../utils/formatters';
 
@@ -25,6 +26,7 @@ interface AttendanceViewProps {
   attendance: AttendanceRecord[];
   profile: StudentProfile;
   isGuru?: boolean;
+  students?: ClassStudent[];
   onSubmitAttendance: (record: AttendanceRecord) => void;
   onDeleteAttendance: (id: string) => void;
   learningCycle?: LearningCycleState;
@@ -47,6 +49,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   attendance,
   profile,
   isGuru = false,
+  students = [],
   onSubmitAttendance,
   onDeleteAttendance,
   learningCycle,
@@ -176,6 +179,17 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           <span className="text-[11px] text-slate-400">Surat dokter terlampir</span>
         </div>
       </div>
+
+      {/* Guru: siapa saja yang sudah / belum presensi hari ini */}
+      {isGuru && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-5 sm:p-6">
+          <div className="pb-3 mb-4 border-b border-slate-100">
+            <h2 className="text-base font-bold text-slate-900">Presensi Hari Ini</h2>
+            <p className="text-xs text-slate-500">{formatIndonesianFullDate(new Date())}</p>
+          </div>
+          <TodayAttendanceSummary attendance={attendance} students={students} todayStr={todayStr} />
+        </div>
+      )}
 
       {/* Main Two Columns: Check-in Box & History Log */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

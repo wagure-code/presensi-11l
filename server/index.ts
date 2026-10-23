@@ -466,6 +466,9 @@ app.get('/api/attendance', requireAuth, ah(async (req, res) => {
 // Siswa submits their own presensi for the day (replaces any existing record for that date)
 app.post('/api/attendance', requireAuth, ah(async (req, res) => {
   const a = req.body;
+  if (req.user!.role === 'guru') {
+    return res.status(403).json({ error: 'Akun guru tidak mengisi presensi. Gunakan Presensi Manual untuk mencatat siswa.' });
+  }
   if (req.user!.role === 'siswa') {
     const jk = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
     const part = (t: string) => jk.find((p) => p.type === t)?.value ?? '';

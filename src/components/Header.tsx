@@ -26,6 +26,7 @@ interface HeaderProps {
   onOpenProfile: () => void;
   onResetData: () => void;
   todayHasCheckedIn: boolean;
+  isGuru?: boolean;
   onQuickCheckIn: () => void;
   learningCycle?: LearningCycleState;
   onOpenCycleModal: () => void;
@@ -40,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProfile,
   onResetData,
   todayHasCheckedIn,
+  isGuru = false,
   onQuickCheckIn,
   learningCycle,
   onOpenCycleModal,
@@ -145,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             {/* Quick Attendance Pill */}
-            {!todayHasCheckedIn ? (
+            {isGuru ? null : !todayHasCheckedIn ? (
               <button
                 id="btn-header-presensi-cepat"
                 onClick={onQuickCheckIn}

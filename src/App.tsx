@@ -24,6 +24,7 @@ import { ScheduleView } from './components/ScheduleView';
 import { HomeworkView } from './components/HomeworkView';
 import { DutyRosterView } from './components/DutyRosterView';
 import { AttendanceView } from './components/AttendanceView';
+import { ClassStudent } from './components/TodayAttendanceSummary';
 import { AddHomeworkModal } from './components/AddHomeworkModal';
 import { NotificationModal } from './components/NotificationModal';
 import { ProfileModal } from './components/ProfileModal';
@@ -68,6 +69,7 @@ function AppShell() {
 
   const [dataLoading, setDataLoading] = useState(true);
   const [schedules, setSchedules] = useState<SubjectSchedule[]>([]);
+  const [students, setStudents] = useState<ClassStudent[]>([]);
   const [savedNames, setSavedNames] = useState<{ subjects: string[]; teachers: string[] }>({ subjects: [], teachers: [] });
   const [duties, setDuties] = useState<CleaningDuty[]>([]);
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
@@ -121,9 +123,11 @@ function AppShell() {
       isGuru ? api.attendanceAll() : api.attendance(),
       api.learningCycle(),
       api.scheduleNames().catch(() => ({ subjects: [], teachers: [] })),
+      isGuru ? api.students().catch(() => []) : Promise.resolve([]),
     ])
-      .then(([s, d, h, a, c, names]) => {
+      .then(([s, d, h, a, c, names, studs]) => {
         if (cancelled) return;
+        setStudents(studs as ClassStudent[]);
         setSchedules(s);
         setSavedNames(names);
         setDuties(d);
@@ -241,6 +245,7 @@ function AppShell() {
   };
 
   const doQuickCheckIn = async () => {
+    if (isGuru) return;
     const gate = getAttendanceGate(learningCycle.currentMode);
     if (!gate.open) {
       showToast(gate.message);
@@ -275,6 +280,7 @@ function AppShell() {
   };
 
   const handleSubmitAttendance = async (record: AttendanceRecord) => {
+    if (isGuru) return;
     const gate = getAttendanceGate(learningCycle.currentMode);
     if (!gate.open) {
       showToast(gate.message);
@@ -486,6 +492,7 @@ function AppShell() {
         onOpenProfile={() => setIsProfileOpen(true)}
         onResetData={logout}
         todayHasCheckedIn={todayHasCheckedIn}
+        isGuru={isGuru}
         onQuickCheckIn={handleQuickCheckIn}
         learningCycle={learningCycle}
         onOpenCycleModal={() => setIsCycleModalOpen(true)}
@@ -507,6 +514,8 @@ function AppShell() {
             <motion.div key="dashboard" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
               <DashboardView
                 profile={profile}
+                isGuru={isGuru}
+                students={students}
                 schedules={schedules}
                 duties={duties}
                 homeworks={homeworks}
@@ -567,6 +576,7 @@ function AppShell() {
                 attendance={attendance}
                 profile={profile}
                 isGuru={isGuru}
+                students={students}
                 onSubmitAttendance={handleSubmitAttendance}
                 onDeleteAttendance={handleDeleteAttendance}
                 learningCycle={learningCycle}

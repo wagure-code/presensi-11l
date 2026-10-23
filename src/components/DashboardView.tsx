@@ -1,4 +1,5 @@
 import React from 'react';
+import { TodayAttendanceSummary, ClassStudent } from './TodayAttendanceSummary';
 import { useAttendanceGate } from '../utils/attendanceWindow';
 import { 
   CheckCircle2, 
@@ -45,6 +46,8 @@ interface DashboardViewProps {
   duties: CleaningDuty[];
   homeworks: Homework[];
   attendance: AttendanceRecord[];
+  isGuru?: boolean;
+  students?: ClassStudent[];
   learningCycle?: LearningCycleState;
   onNavigateTab: (tab: 'schedule' | 'homework' | 'duty' | 'attendance') => void;
   onQuickCheckIn: () => void;
@@ -60,6 +63,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   duties,
   homeworks,
   attendance,
+  isGuru = false,
+  students = [],
   learningCycle,
   onNavigateTab,
   onQuickCheckIn,
@@ -141,7 +146,16 @@ const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).
 
           {/* Quick Action Button in Hero */}
           <div className="flex flex-wrap items-center gap-3">
-            {!todayAttendance ? (
+            {isGuru ? (
+              <button
+                id="hero-btn-presensi"
+                onClick={() => onNavigateTab('attendance')}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>Lihat Presensi Hari Ini</span>
+              </button>
+            ) : !todayAttendance ? (
               <button
                 id="hero-btn-presensi"
                 onClick={onQuickCheckIn}
@@ -291,10 +305,12 @@ const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl sm:text-2xl font-bold text-slate-900 capitalize">
-              {todayAttendance ? todayAttendance.status : 'Belum'}
+              {isGuru
+                ? `${students.filter((st) => attendance.some((a) => a.date === todayStr && a.userId === st.id)).length}/${students.length}`
+                : todayAttendance ? todayAttendance.status : 'Belum'}
             </span>
             <span className="text-[11px] text-slate-400 font-medium">
-              {todayAttendance ? `(${todayAttendance.time.substring(0, 5)})` : 'absen'}
+              {isGuru ? 'sudah presensi' : todayAttendance ? `(${todayAttendance.time.substring(0, 5)})` : 'absen'}
             </span>
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
@@ -717,7 +733,11 @@ const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).
             </div>
 
             {/* Quick presence check-in box */}
-            {!todayAttendance ? (
+            {isGuru ? (
+              <div className="mb-4">
+                <TodayAttendanceSummary attendance={attendance} students={students} todayStr={todayStr} compact />
+              </div>
+            ) : !todayAttendance ? (
               <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 mb-4 text-center">
                 <p className="text-xs font-bold text-indigo-900 mb-1">
                   Kamu Belum Mengisi Presensi Hari Ini!
