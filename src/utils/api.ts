@@ -94,6 +94,12 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  resyncAttendanceSheet: () =>
+    apiFetch<{ date: string; totalSiswa: number; web: number; sheetBefore: number; sheetAfter: number; added: number; updated: number }>(
+      '/api/settings/attendance-sheet/resync',
+      { method: 'POST', body: JSON.stringify({}) }
+    ),
+
   dedupeAttendanceSheet: () =>
     apiFetch<{ removed: number }>('/api/settings/attendance-sheet/dedupe', { method: 'POST' }),
 

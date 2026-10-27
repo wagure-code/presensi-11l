@@ -9,6 +9,8 @@ export const AttendanceSheetSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncMessage, setResyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [deduping, setDeduping] = useState(false);
   const [dedupeMessage, setDedupeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -41,6 +43,26 @@ export const AttendanceSheetSettings: React.FC = () => {
       setMessage({ type: 'error', text: err?.message || 'Gagal menyimpan, coba lagi.' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResync = async () => {
+    setResyncing(true);
+    setResyncMessage(null);
+    try {
+      const r = await api.resyncAttendanceSheet();
+      const lengkap = r.sheetAfter >= r.web;
+      setResyncMessage({
+        type: lengkap ? 'success' : 'error',
+        text:
+          `Web: ${r.web} dari ${r.totalSiswa} siswa • Sheet sebelum: ${r.sheetBefore} • Sheet sekarang: ${r.sheetAfter}.` +
+          (r.added > 0 ? ` ${r.added} baris yang kurang ditambahkan.` : '') +
+          (lengkap ? ' Sudah sama.' : ' Masih ada selisih — cek format tanggal di sheet (harus dd/mm/yy).'),
+      });
+    } catch (err: any) {
+      setResyncMessage({ type: 'error', text: err?.message || 'Gagal mengecek sheet, coba lagi.' });
+    } finally {
+      setResyncing(false);
     }
   };
 
@@ -105,6 +127,22 @@ export const AttendanceSheetSettings: React.FC = () => {
 
       {savedSheetId && (
         <div className="mt-3 pt-3 border-t border-slate-100">
+          <p className="text-xs text-slate-500 mb-2">
+            Cek apakah presensi hari ini di web (termasuk yang otomatis) jumlahnya sudah sama dengan di sheet.
+            Baris yang kurang di sheet akan dilengkapi.
+          </p>
+          <button
+            onClick={handleResync}
+            disabled={resyncing}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 mb-2"
+          >
+            {resyncing ? 'Mengecek...' : 'Cek & Sinkronkan Presensi Hari Ini'}
+          </button>
+          {resyncMessage && (
+            <p className={`text-sm mb-3 ${resyncMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+              {resyncMessage.text}
+            </p>
+          )}
           <p className="text-xs text-slate-500 mb-2">
             Ada presensi yang nyangkut dobel di sheet (mis. karena double-klik tombol)? Bersihkan di sini — baris
             terbaru per siswa per tanggal akan dipertahankan, sisanya dihapus.

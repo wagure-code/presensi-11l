@@ -81,51 +81,95 @@ export interface AttendanceSheetRow {
 
 // Layout: A Timestamp | B Email | C Nama | D Link Validasi | E Tanggal | F Valid | G Status | H Keterangan
 // Baris dari Web: F dikosongin biar formula Dashboard lama tetap aman. B & D diisi email yang sama.
-export async function appendAttendanceRow(sheetId: string, tabName: string, row: AttendanceSheetRow) {
+// Kunci pencocokan baris: Email + Tanggal. Siswa yang emailnya tidak ketemu di daftar
+// (email kosong) dicocokkan lewat Nama supaya dua siswa tanpa email tidak saling menimpa.
+function rowKey(email: string, name: string, dateFormatted: string): string {
+  return `${email || `nama:${name.toLowerCase()}`}|${dateFormatted}`;
+}
+
+// Tulis BANYAK baris presensi sekaligus dengan jumlah panggilan API yang tetap
+// (1x baca + paling banyak 2x tulis), berapa pun jumlah barisnya. Upsert per
+// Email+Tanggal: baris yang sudah ada ditimpa, yang belum ada ditambahkan di bawah.
+// Dibuat batch karena menulis satu-satu (2 panggilan per siswa) bisa kena batas
+// waktu fungsi Vercel / kuota Sheets API sehingga sebagian siswa tidak masuk sheet.
+export async function syncAttendanceRows(
+  sheetId: string,
+  tabName: string,
+  rowsIn: AttendanceSheetRow[],
+  opts: { onlyMissing?: boolean } = {}
+): Promise<{ updated: number; appended: number }> {
+  if (rowsIn.length === 0) return { updated: 0, appended: 0 };
   const auth = getAuth();
   const sheets = google.sheets({ version: 'v4', auth });
 
-  const { name, email } = resolveStudent(row.name);
-  const targetDateFormatted = toSheetDateFormat(row.date);
-
-  // Cari baris existing milik siswa yang sama di tanggal yang sama (kolom B=Email,
-  // E=Tanggal). Kalau ketemu, baris itu DITIMPA alih-alih nambah baris baru —
-  // menyamai perilaku tabel `attendance` di database (DELETE lalu INSERT per
-  // siswa per tanggal). Ini mencegah baris dobel kalau endpoint presensi
-  // terpanggil lebih dari sekali untuk hari yang sama (double-klik tombol,
-  // retry jaringan, dst).
   const existing = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
     range: `${tabName}!B:E`,
   });
-  const rows = existing.data.values || [];
-  let targetRow = rows.length + 1;
-  for (let i = 1; i < rows.length; i++) {
-    const rowEmail = rows[i]?.[0];
-    const rowDate = rows[i]?.[3];
-    if (rowEmail === email && rowDate === targetDateFormatted) {
-      targetRow = i + 1;
-      break;
-    }
+  const present = existing.data.values || [];
+  const rowIndexByKey = new Map<string, number>(); // key -> nomor baris di sheet (1-based)
+  for (let i = 1; i < present.length; i++) {
+    const r = present[i] || [];
+    rowIndexByKey.set(rowKey(String(r[0] ?? ''), String(r[1] ?? ''), String(r[3] ?? '')), i + 1);
   }
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: `${tabName}!A${targetRow}:H${targetRow}`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [[
-        row.timestamp,
-        email,
-        name,
-        email,
-        targetDateFormatted,
-        'Valid',
-        mapStatusForSheet(row.status),
-        row.note ?? '',
-      ]],
-    },
-  });
+  const toCells = (row: AttendanceSheetRow) => {
+    const { name, email } = resolveStudent(row.name);
+    const dateFormatted = toSheetDateFormat(row.date);
+    return {
+      key: rowKey(email, name, dateFormatted),
+      cells: [row.timestamp, email, name, email, dateFormatted, 'Valid', mapStatusForSheet(row.status), row.note ?? ''],
+    };
+  };
+
+  const updates: { range: string; values: any[][] }[] = [];
+  const fresh = new Map<string, any[]>(); // key -> sel (dedup di dalam batch)
+  for (const row of rowsIn) {
+    const { key, cells } = toCells(row);
+    const at = rowIndexByKey.get(key);
+    if (at && opts.onlyMissing) continue; // jangan timpa baris yang sudah ada
+    if (at) updates.push({ range: `${tabName}!A${at}:H${at}`, values: [cells] });
+    else fresh.set(key, cells);
+  }
+
+  if (updates.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: { valueInputOption: 'USER_ENTERED', data: updates },
+    });
+  }
+  if (fresh.size > 0) {
+    const start = present.length + 1;
+    const values = Array.from(fresh.values());
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${tabName}!A${start}:H${start + values.length - 1}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    });
+  }
+  return { updated: updates.length, appended: fresh.size };
+}
+
+// Layout: A Timestamp | B Email | C Nama | D Link Validasi | E Tanggal | F Valid | G Status | H Keterangan
+// Baris dari Web: F dikosongin biar formula Dashboard lama tetap aman. B & D diisi email yang sama.
+export async function appendAttendanceRow(sheetId: string, tabName: string, row: AttendanceSheetRow) {
+  await syncAttendanceRows(sheetId, tabName, [row]);
+}
+
+// Hitung berapa siswa (unik) yang tercatat di sheet untuk satu tanggal (ISO yyyy-mm-dd).
+export async function countSheetAttendanceForDate(sheetId: string, tabName: string, isoDate: string): Promise<number> {
+  const auth = getAuth();
+  const sheets = google.sheets({ version: 'v4', auth });
+  const existing = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${tabName}!B:E` });
+  const present = existing.data.values || [];
+  const target = toSheetDateFormat(isoDate);
+  const seen = new Set<string>();
+  for (let i = 1; i < present.length; i++) {
+    const r = present[i] || [];
+    if (String(r[3] ?? '') === target) seen.add(rowKey(String(r[0] ?? ''), String(r[1] ?? ''), target));
+  }
+  return seen.size;
 }
 
 // Bersihin baris presensi dobel yang sudah kadung ada di sheet (sebelum

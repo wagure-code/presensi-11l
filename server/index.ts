@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import db, { initSchema } from './db.js';
 import { signToken, requireAuth, requireGuru } from './auth.js';
 import { autoMarkAttendanceForClass, autoMarkAttendanceAllClasses } from './utils/autoAttendance.js';
-import { appendAttendanceRow, dedupeAttendanceSheet, extractSheetId, formatSheetTimestamp } from './utils/googleSheets.js';
+import { appendAttendanceRow, syncAttendanceRows, countSheetAttendanceForDate, dedupeAttendanceSheet, extractSheetId, formatSheetTimestamp } from './utils/googleSheets.js';
 
 const app = express();
 app.use(cors());
@@ -610,6 +610,48 @@ app.post('/api/settings/attendance-sheet/dedupe', requireAuth, requireGuru, ah(a
   }
   const result = await dedupeAttendanceSheet(row.attendanceSheetId, row.attendanceSheetTab || 'Form_Responses');
   res.json(result);
+}));
+
+// Guru: cek ulang apakah presensi (termasuk yang otomatis) hari ini di web sudah sama
+// jumlahnya dengan di Google Sheet, dan lengkapi baris yang kurang di sheet.
+app.post('/api/settings/attendance-sheet/resync', requireAuth, requireGuru, ah(async (req, res) => {
+  const cfg = await db.prepare(`SELECT attendanceSheetId, attendanceSheetTab FROM users WHERE id = ?`).get(req.user!.id) as any;
+  if (!cfg?.attendanceSheetId) {
+    return res.status(400).json({ error: 'Belum ada Google Sheet yang terhubung untuk kelas ini.' });
+  }
+  const tab = cfg.attendanceSheetTab || 'Form_Responses';
+  const date = typeof req.body?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date) ? req.body.date : todayJakarta();
+
+  const records = await db.prepare(
+    `SELECT u.name AS name, a.status AS status, a.note AS note, a.time AS time FROM attendance a JOIN users u ON u.id = a.userId
+     WHERE a.className = ? AND a.date = ?`
+  ).all(req.user!.className, date) as any[];
+  const totalRow = await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'siswa' AND className = ?`).get(req.user!.className) as any;
+
+  const sheetBefore = await countSheetAttendanceForDate(cfg.attendanceSheetId, tab, date);
+  const [y, m, d] = date.split('-');
+  const result = await syncAttendanceRows(
+    cfg.attendanceSheetId,
+    tab,
+    records.map((r) => ({
+      timestamp: `${d}/${m}/${y} ${String(r.time || '00:00:00').padStart(8, '0')}`,
+      name: r.name,
+      date,
+      status: r.status,
+      note: r.note || '',
+    })),
+    { onlyMissing: true } // cek ulang hanya melengkapi yang kurang, tidak menimpa baris yang sudah ada
+  );
+  const sheetAfter = await countSheetAttendanceForDate(cfg.attendanceSheetId, tab, date);
+  res.json({
+    date,
+    totalSiswa: Number(totalRow?.n ?? 0),
+    web: records.length,
+    sheetBefore,
+    sheetAfter,
+    added: result.appended,
+    updated: result.updated,
+  });
 }));
 
 // ---------- LEARNING CYCLE ----------

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import db from '../db.js';
-import { appendAttendanceRow, formatSheetTimestamp } from './googleSheets.js';
+import { syncAttendanceRows, formatSheetTimestamp } from './googleSheets.js';
 
 // Aturan: selama mode tatap muka (offline), siswa yang sampai jam 11.00 WIB
 // belum presensi pada hari itu (Senin–Minggu) otomatis dicatat HADIR oleh sistem.
@@ -44,27 +44,31 @@ export async function autoMarkAttendanceForClass(className: string): Promise<num
       .run(randomUUID(), s.id, className, date, `${String(AUTO_ATTENDANCE_HOUR).padStart(2, '0')}:00:00`, note);
   }
 
-  // Sinkron ke Google Sheet (best-effort; appendAttendanceRow sudah upsert per email+tanggal).
-  if (missing.length > 0) {
+  // Sinkron ke Google Sheet secara batch. Yang disinkronkan SEMUA presensi otomatis hari ini
+  // (bukan cuma yang baru dimasukkan sekarang), jadi kalau run sebelumnya gagal/terpotong di
+  // tengah jalan, run berikutnya melengkapi yang kurang. Upsert, jadi aman diulang.
+  const autoRows = (await db
+    .prepare(
+      `SELECT u.name AS name, a.status AS status, a.note AS note FROM attendance a JOIN users u ON u.id = a.userId
+       WHERE a.className = ? AND a.date = ? AND a.method = 'Otomatis (Sistem)'`
+    )
+    .all(className, date)) as { name: string; status: string; note: string }[];
+
+  const guru = (await db
+    .prepare(
+      `SELECT attendanceSheetId, attendanceSheetTab FROM users WHERE role = 'guru' AND className = ? ORDER BY attendanceSheetId IS NULL ASC LIMIT 1`
+    )
+    .get(className)) as any;
+  if (guru?.attendanceSheetId && autoRows.length > 0) {
     try {
-      const guru = (await db
-        .prepare(
-          `SELECT attendanceSheetId, attendanceSheetTab FROM users WHERE role = 'guru' AND className = ? ORDER BY attendanceSheetId IS NULL ASC LIMIT 1`
-        )
-        .get(className)) as any;
-      if (guru?.attendanceSheetId) {
-        for (const s of missing) {
-          await appendAttendanceRow(guru.attendanceSheetId, guru.attendanceSheetTab || 'Form_Responses', {
-            timestamp: formatSheetTimestamp(now),
-            name: s.name,
-            date,
-            status: 'hadir',
-            note,
-          });
-        }
-      }
+      await syncAttendanceRows(
+        guru.attendanceSheetId,
+        guru.attendanceSheetTab || 'Form_Responses',
+        autoRows.map((r) => ({ timestamp: formatSheetTimestamp(now), name: r.name, date, status: r.status, note: r.note || '' }))
+      );
     } catch (err) {
       console.error('Gagal sync presensi otomatis ke Google Sheet:', err);
+      return missing.length; // jangan tandai selesai -> dicoba lagi di pemanggilan berikutnya
     }
   }
 
