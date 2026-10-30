@@ -95,7 +95,7 @@ export const api = {
     }),
 
   resyncAttendanceSheet: () =>
-    apiFetch<{ date: string; totalSiswa: number; web: number; sheetBefore: number; sheetAfter: number; added: number; updated: number }>(
+    apiFetch<{ date: string; totalSiswa: number; web: number; sheetBefore: number; sheetAfter: number; added: number; updated: number; unmatched: string[]; collisions: string[] }>(
       '/api/settings/attendance-sheet/resync',
       { method: 'POST', body: JSON.stringify({}) }
     ),

@@ -53,11 +53,13 @@ export const AttendanceSheetSettings: React.FC = () => {
       const r = await api.resyncAttendanceSheet();
       const lengkap = r.sheetAfter >= r.web;
       setResyncMessage({
-        type: lengkap ? 'success' : 'error',
+        type: lengkap && !r.collisions.length ? 'success' : 'error',
         text:
           `Web: ${r.web} dari ${r.totalSiswa} siswa • Sheet sebelum: ${r.sheetBefore} • Sheet sekarang: ${r.sheetAfter}.` +
           (r.added > 0 ? ` ${r.added} baris yang kurang ditambahkan.` : '') +
-          (lengkap ? ' Sudah sama.' : ' Masih ada selisih — cek format tanggal di sheet (harus dd/mm/yy).'),
+          (lengkap ? ' Sudah sama.' : ' Masih ada selisih — cek format tanggal di sheet (harus dd/mm/yy).') +
+          (r.collisions.length ? ` Nama bentrok email: ${r.collisions.join('; ')}.` : '') +
+          (r.unmatched.length ? ` Belum ada email di daftar: ${r.unmatched.join(', ')}.` : ''),
       });
     } catch (err: any) {
       setResyncMessage({ type: 'error', text: err?.message || 'Gagal mengecek sheet, coba lagi.' });

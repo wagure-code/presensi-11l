@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import db, { initSchema } from './db.js';
 import { signToken, requireAuth, requireGuru } from './auth.js';
 import { autoMarkAttendanceForClass, autoMarkAttendanceAllClasses } from './utils/autoAttendance.js';
-import { appendAttendanceRow, syncAttendanceRows, countSheetAttendanceForDate, dedupeAttendanceSheet, extractSheetId, formatSheetTimestamp } from './utils/googleSheets.js';
+import { appendAttendanceRow, syncAttendanceRows, countSheetAttendanceForDate, diagnoseStudentMatches, dedupeAttendanceSheet, extractSheetId, formatSheetTimestamp } from './utils/googleSheets.js';
 
 const app = express();
 app.use(cors());
@@ -643,7 +643,10 @@ app.post('/api/settings/attendance-sheet/resync', requireAuth, requireGuru, ah(a
     { onlyMissing: true } // cek ulang hanya melengkapi yang kurang, tidak menimpa baris yang sudah ada
   );
   const sheetAfter = await countSheetAttendanceForDate(cfg.attendanceSheetId, tab, date);
+  const allStudents = await db.prepare(`SELECT name FROM users WHERE role = 'siswa' AND className = ?`).all(req.user!.className) as any[];
+  const diag = diagnoseStudentMatches(allStudents.map((x) => x.name));
   res.json({
+    ...diag,
     date,
     totalSiswa: Number(totalRow?.n ?? 0),
     web: records.length,

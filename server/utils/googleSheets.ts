@@ -58,8 +58,32 @@ const STUDENTS: [string, string][] = [
 // Cari nickname + email dari nama lengkap portal. Kalau nggak ketemu, pakai nama aslinya apa adanya.
 function resolveStudent(fullName: string): { name: string; email: string } {
   const lower = fullName.toLowerCase();
-  const match = STUDENTS.find(([nickname]) => lower.includes(nickname.toLowerCase()));
-  return match ? { name: match[0], email: match[1] } : { name: fullName, email: '' };
+  const words = lower.split(/[^a-z0-9]+/).filter(Boolean);
+  // 1) Cocok sebagai KATA utuh (mis. "Rezky" di "Rezky Alfawwaz") — paling aman.
+  const exact = STUDENTS.filter(([nick]) => words.includes(nick.toLowerCase()));
+  if (exact.length === 1) return { name: exact[0][0], email: exact[0][1] };
+  // 2) Cocok sebagai potongan teks, HANYA kalau tidak ambigu. Nama pendek seperti "Al"
+  //    gampang nyangkut di nama lain ("Alfawwaz", "Alkha") dan bikin dua siswa
+  //    memakai email yang sama sehingga barisnya saling menimpa.
+  if (exact.length === 0) {
+    const partial = STUDENTS.filter(([nick]) => lower.includes(nick.toLowerCase()));
+    if (partial.length === 1) return { name: partial[0][0], email: partial[0][1] };
+  }
+  // Tidak ketemu / ambigu: tulis dengan nama lengkap & email kosong (tetap masuk sheet, tidak menimpa siswa lain).
+  return { name: fullName, email: '' };
+}
+
+// Untuk laporan cek ulang: siswa mana yang tidak punya email cocok, atau bentrok dengan siswa lain.
+export function diagnoseStudentMatches(fullNames: string[]): { unmatched: string[]; collisions: string[] } {
+  const byEmail = new Map<string, string[]>();
+  const unmatched: string[] = [];
+  for (const n of fullNames) {
+    const r = resolveStudent(n);
+    if (!r.email) unmatched.push(n);
+    else byEmail.set(r.email, [...(byEmail.get(r.email) ?? []), n]);
+  }
+  const collisions = Array.from(byEmail.values()).filter((v) => v.length > 1).map((v) => v.join(' = '));
+  return { unmatched, collisions };
 }
 
 function mapStatusForSheet(status: string): string {
