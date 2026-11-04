@@ -56,17 +56,26 @@ const STUDENTS: [string, string][] = [
 ];
 
 // Cari nickname + email dari nama lengkap portal. Kalau nggak ketemu, pakai nama aslinya apa adanya.
+// Nama panggilan yang TIDAK muncul (atau terlalu pendek/ambigu) di nama lengkap portal
+// dikenali lewat alias ini. Contoh: "Vee" = "Siti Zhavira Alkha".
+const ALIASES: Record<string, string[]> = {
+  Vee: ['zhavira'],
+  Al: ['alfaruq', 'al faruq'],
+};
+
 function resolveStudent(fullName: string): { name: string; email: string } {
   const lower = fullName.toLowerCase();
   const words = lower.split(/[^a-z0-9]+/).filter(Boolean);
-  // 1) Cocok sebagai KATA utuh (mis. "Rezky" di "Rezky Alfawwaz") — paling aman.
-  const exact = STUDENTS.filter(([nick]) => words.includes(nick.toLowerCase()));
+  // 1) Kata utuh atau alias — paling aman. (Nama pendek seperti "Al" TIDAK boleh
+  //    dicocokkan sebagai potongan teks: nyangkut di "Alfawwaz"/"Alkha".)
+  const exact = STUDENTS.filter(
+    ([nick]) =>
+      words.includes(nick.toLowerCase()) || (ALIASES[nick] ?? []).some((a) => lower.includes(a))
+  );
   if (exact.length === 1) return { name: exact[0][0], email: exact[0][1] };
-  // 2) Cocok sebagai potongan teks, HANYA kalau tidak ambigu. Nama pendek seperti "Al"
-  //    gampang nyangkut di nama lain ("Alfawwaz", "Alkha") dan bikin dua siswa
-  //    memakai email yang sama sehingga barisnya saling menimpa.
+  // 2) Potongan teks hanya untuk nama panggilan >= 4 huruf dan hanya kalau tidak ambigu.
   if (exact.length === 0) {
-    const partial = STUDENTS.filter(([nick]) => lower.includes(nick.toLowerCase()));
+    const partial = STUDENTS.filter(([nick]) => nick.length >= 4 && lower.includes(nick.toLowerCase()));
     if (partial.length === 1) return { name: partial[0][0], email: partial[0][1] };
   }
   // Tidak ketemu / ambigu: tulis dengan nama lengkap & email kosong (tetap masuk sheet, tidak menimpa siswa lain).
